@@ -15,8 +15,8 @@ working increment.
 | Motion | Framer Motion |
 | Backend | Express + TypeScript |
 | Validation | Joi |
-| Database | PostgreSQL, via Prisma (added Phase 1) |
-| Auth | JWT in an httpOnly cookie (added Phase 1) |
+| Database | PostgreSQL, via Prisma |
+| Auth | JWT in an httpOnly cookie, bcrypt-hashed passwords |
 
 ## Monorepo layout
 
@@ -35,16 +35,55 @@ Prerequisites: Node 22+, a local PostgreSQL server.
 ```bash
 npm install                       # installs both workspaces from the root
 
-# backend/.env — copy backend/.env.example and fill in your Postgres
-# credentials. Never commit this file.
+# backend/.env — copy backend/.env.example, fill in DATABASE_URL with your
+# own Postgres credentials and a random JWT_SECRET. Never commit this file.
+#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+cd backend
+npx prisma migrate dev            # creates all 21 tables
+npx prisma db seed                # seeds roles, capabilities, and a first
+                                   # account: admin / admin123 — the app
+                                   # forces a password change on first use
+cd ..
 npm run dev:backend               # http://localhost:4000
 
 # frontend/.env.local — copy frontend/.env.example
 npm run dev:frontend              # http://localhost:3000
 ```
 
-Open `http://localhost:3000` — Phase 0's home page confirms the frontend can
-reach the backend and the backend can reach Postgres.
+Open `http://localhost:3000` — the home page confirms the frontend can reach
+the backend and the backend can reach Postgres.
+
+Try the API directly:
+
+```bash
+curl -c /tmp/c.txt -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+
+curl -b /tmp/c.txt http://localhost:4000/api/auth/me
+```
+
+## Authentication & roles
+
+No public sign-up, by design — client and staff accounts are both issued, not
+self-registered, the same reasoning as the original build: a public
+"create an account" page controlling access to real case files is a
+liability, not a feature.
+
+- A **role** (`admin`, `editor`, `associate`, or a custom one) grants a set of
+  **capabilities** — `cases.view`, `money.edit`, `blog.edit`, and so on — via
+  the `role_caps` table. The full list lives in
+  `backend/src/lib/capabilities.ts`.
+- The **admin** role is the one fixed point: `requireCap()` always lets it
+  through, whatever `role_caps` says, so there is no way to lock the account
+  that grants access out of granting it.
+- A freshly created account carries `mustChangePassword: true`. Every route
+  except `/api/auth/change-password` and `/api/auth/logout` refuses it with
+  403 until that is cleared — enforced server-side
+  (`requireNoPendingPasswordChange`), not just hidden in a UI.
+- Eight wrong passwords in a row lock that identity out for fifteen minutes
+  (`backend/src/lib/login-throttle.ts`), scoped by identity **and** IP so one
+  bad actor doesn't lock out everyone else signing in from elsewhere.
 
 ## Conventions
 
@@ -69,7 +108,7 @@ reach the backend and the backend can reach Postgres.
 ## Phases
 
 - [x] **Phase 0** — monorepo scaffold, tooling, walking skeleton
-- [ ] Phase 1 — Postgres schema (Prisma) + authentication & roles
+- [x] **Phase 1** — Postgres schema (Prisma, 21 tables) + authentication & roles
 - [ ] Phase 2 — design system: shared UI primitives, app shells
 - [ ] Phase 3 — public marketing site
 - [ ] Phase 4 — client portal + login flows

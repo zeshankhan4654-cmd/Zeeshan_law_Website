@@ -1,0 +1,381 @@
+// The chambers system's data model — 21 tables carried over from the
+// original design, translated to Postgres. camelCase in code, snake_case in
+// the database (via @map/@@map), so both SQL and TypeScript read naturally.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Accounts, roles and access
+// ---------------------------------------------------------------------------
+
+/// A staff account. The Principal (role "admin") always holds every
+/// capability regardless of what role_caps says — enforced in application
+/// code, not here, so a future capability is automatically covered.
+model User {
+  id                Int      @id @default(autoincrement())
+  username          String   @unique
+  passwordHash      String   @map("password_hash")
+  fullName          String   @map("full_name")
+  role              String
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+/// A role staff accounts are assigned. Three ship as defaults (admin, editor,
+/// associate) but "Add a role of your own" is a first-class feature — any
+/// role_key not in that starting set is just as valid.
+model Role {
+  id          Int      @id @default(autoincrement())
+  roleKey     String   @unique @map("role_key")
+  label       String
+  description String   @default("")
+  isSystem    Boolean  @default(false) @map("is_system")
+  sortOrder   Int      @default(50) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("roles")
+}
+
+/// Which capabilities a role holds. The capability keys themselves
+/// ("cases.view", "money.edit", ...) are defined in application code
+/// (src/lib/capabilities.ts), not as a database enum, so the list can grow
+/// without a migration.
+model RoleCap {
+  roleKey String @map("role_key")
+  cap     String
+
+  @@id([roleKey, cap])
+  @@map("role_caps")
+}
+
+/// Failed sign-in tracking, keyed by (scope, identity, ip) so a client login
+/// and an office login for the same name are throttled independently.
+model LoginAttempt {
+  id          Int       @id @default(autoincrement())
+  scope       String
+  identity    String
+  ip          String
+  attempts    Int       @default(0)
+  lockedUntil DateTime? @map("locked_until")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([scope, identity, ip])
+  @@map("login_attempts")
+}
+
+// ---------------------------------------------------------------------------
+// Clients and cases
+// ---------------------------------------------------------------------------
+
+model Client {
+  id              Int      @id @default(autoincrement())
+  name            String
+  phone           String   @default("")
+  email           String   @default("")
+  address         String   @default("")
+  portalEnabled   Boolean  @default(false) @map("portal_enabled")
+  portalUsername  String?  @unique @map("portal_username")
+  portalHash      String?  @map("portal_hash")
+  portalShowFees  Boolean  @default(false) @map("portal_show_fees")
+  notes           String   @default("")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  cases         Case[]
+  communications Communication[]
+
+  @@map("clients")
+}
+
+model Case {
+  id          Int       @id @default(autoincrement())
+  clientId    Int       @map("client_id")
+  title       String
+  court       String    @default("")
+  caseType    String    @default("") @map("case_type")
+  status      String    @default("Active")
+  nextHearing DateTime? @map("next_hearing") @db.Date
+  /// Internal only — never shown to the client portal.
+  notes       String    @default("")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  hearings  Hearing[]
+  updates   CaseUpdate[]
+  messages  CaseMessage[]
+  documents Document[]
+  fees      Fee[]
+  research  Research[]
+
+  @@index([clientId])
+  @@map("cases")
+}
+
+model Hearing {
+  id          Int      @id @default(autoincrement())
+  caseId      Int      @map("case_id")
+  hearingDate DateTime @map("hearing_date") @db.Date
+  purpose     String   @default("")
+  /// Internal only — never shown to the client portal.
+  outcome     String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("hearings")
+}
+
+/// A progress note posted to a case. Client-visible by design — this is how
+/// a client sees what has happened without phoning the office.
+model CaseUpdate {
+  id         Int      @id @default(autoincrement())
+  caseId     Int      @map("case_id")
+  updateDate DateTime @map("update_date") @db.Date
+  message    String
+  author     String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_updates")
+}
+
+/// The message thread between a client and the office on one case, including
+/// client voice notes (storedName set when the message carries a recording).
+model CaseMessage {
+  id          Int      @id @default(autoincrement())
+  caseId      Int      @map("case_id")
+  authorType  String   @map("author_type") // "client" | "office"
+  authorName  String   @default("") @map("author_name")
+  body        String   @default("")
+  storedName  String   @default("") @map("stored_name")
+  origName    String   @default("") @map("orig_name")
+  answered    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_messages")
+}
+
+model Document {
+  id             Int      @id @default(autoincrement())
+  caseId         Int      @map("case_id")
+  title          String
+  storedName     String   @default("") @map("stored_name")
+  origName       String   @default("") @map("orig_name")
+  sizeBytes      Int      @default(0) @map("size_bytes")
+  /// Private by default — an office action must deliberately mark a
+  /// document Shared before a client can see it.
+  clientVisible  Boolean  @default(false) @map("client_visible")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("documents")
+}
+
+// ---------------------------------------------------------------------------
+// Money
+// ---------------------------------------------------------------------------
+
+model Fee {
+  id        Int      @id @default(autoincrement())
+  caseId    Int      @map("case_id")
+  kind      String   // "agreed" | "received"
+  amount    Decimal  @db.Decimal(12, 2)
+  entryDate DateTime @map("entry_date") @db.Date
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("fees")
+}
+
+model OfficialFee {
+  id        Int      @id @default(autoincrement())
+  caseId    Int?     @map("case_id")
+  kind      String
+  amount    Decimal  @db.Decimal(12, 2)
+  entryDate DateTime @map("entry_date") @db.Date
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("official_fees")
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  category    String
+  amount      Decimal  @db.Decimal(12, 2)
+  expenseDate DateTime @map("expense_date") @db.Date
+  description String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("expenses")
+}
+
+// ---------------------------------------------------------------------------
+// Diary
+// ---------------------------------------------------------------------------
+
+model Communication {
+  id            Int       @id @default(autoincrement())
+  clientId      Int?      @map("client_id")
+  method        String    // "call" | "email" | "in_person"
+  summary       String
+  commDate      DateTime  @map("comm_date") @db.Date
+  followUpDue   DateTime? @map("follow_up_due") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@map("communications")
+}
+
+// ---------------------------------------------------------------------------
+// Library — public once published
+// ---------------------------------------------------------------------------
+
+model Judgment {
+  id            Int       @id @default(autoincrement())
+  title         String
+  citation      String    @default("")
+  court         String    @default("")
+  judges        String    @default("")
+  judgmentDate  DateTime? @map("judgment_date") @db.Date
+  sections      String    @default("")
+  principle     String    @default("")
+  summary       String    @default("")
+  tags          String    @default("")
+  sourceUrl     String    @default("") @map("source_url")
+  storedName    String    @default("") @map("stored_name")
+  origName      String    @default("") @map("orig_name")
+  sizeBytes     Int       @default(0) @map("size_bytes")
+  published     Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("judgments")
+}
+
+model Research {
+  id          Int      @id @default(autoincrement())
+  title       String
+  topic       String   @default("")
+  summary     String   @default("")
+  body        String   @default("")
+  tags        String   @default("")
+  caseId      Int?     @map("case_id")
+  storedName  String   @default("") @map("stored_name")
+  origName    String   @default("") @map("orig_name")
+  sizeBytes   Int      @default(0) @map("size_bytes")
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@map("research")
+}
+
+model Media {
+  id          Int       @id @default(autoincrement())
+  title       String
+  kind        String    @default("Video") // "Video" | "Lecture" | ...
+  description String    @default("")
+  topic       String    @default("")
+  url         String    @default("")
+  recordedOn  DateTime? @map("recorded_on") @db.Date
+  storedName  String    @default("") @map("stored_name")
+  origName    String    @default("") @map("orig_name")
+  sizeBytes   Int       @default(0) @map("size_bytes")
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("media")
+}
+
+// ---------------------------------------------------------------------------
+// The public website
+// ---------------------------------------------------------------------------
+
+model Enquiry {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String   @default("")
+  email     String   @default("")
+  subject   String   @default("")
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("enquiries")
+}
+
+/// Key/value settings the Principal edits from Site Settings — address,
+/// phones, WhatsApp, map, social accounts. Anything absent falls back to a
+/// constant in application config, so a fresh install works before anyone
+/// has touched this table.
+model Setting {
+  key       String   @id @map("skey")
+  value     String   @default("") @map("sval")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Testimonial {
+  id         Int      @id @default(autoincrement())
+  author     String
+  role       String   @default("")
+  body       String
+  rating     Int      @default(5)
+  source     String   @default("Google")
+  sourceUrl  String   @default("") @map("source_url")
+  published  Boolean  @default(true)
+  sortOrder  Int      @default(50) @map("sort_order")
+  createdBy  String   @default("") @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([published, sortOrder])
+  @@map("testimonials")
+}
+
+model Post {
+  id           Int       @id @default(autoincrement())
+  slug         String    @unique
+  title        String
+  summary      String    @default("")
+  body         String    @default("")
+  category     String    @default("")
+  tags         String    @default("")
+  coverName    String    @default("") @map("cover_name")
+  coverOrig    String    @default("") @map("cover_orig")
+  author       String    @default("")
+  published    Boolean   @default(false)
+  publishedOn  DateTime? @map("published_on") @db.Date
+  views        Int       @default(0)
+  createdBy    String    @default("") @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([published, publishedOn])
+  @@map("posts")
+}

@@ -5,6 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { authRouter } from "./routes/auth.route.js";
 import { healthRouter } from "./routes/health.route.js";
 
 export function createApp(): Express {
@@ -17,7 +18,7 @@ export function createApp(): Express {
   app.use(
     cors({
       origin: env.corsOrigin,
-      credentials: true, // the auth cookie (added in Phase 1) travels with requests
+      credentials: true, // lets the session cookie travel with cross-origin requests
     })
   );
 
@@ -29,6 +30,7 @@ export function createApp(): Express {
   }
 
   app.use("/api/health", healthRouter);
+  app.use("/api/auth", authRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
