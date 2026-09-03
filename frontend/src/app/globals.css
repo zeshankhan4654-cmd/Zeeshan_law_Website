@@ -40,3 +40,57 @@ body {
   color: var(--color-ink-soft);
   font-family: var(--font-sans);
 }
+
+/* ---------- Table (components/ui/Table.tsx) ---------- */
+
+.tbl {
+  background: var(--color-surface);
+}
+.tbl th {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--color-rule);
+  white-space: nowrap;
+}
+.tbl td {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-rule) 60%, transparent);
+  vertical-align: middle;
+}
+.tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.tbl tbody tr:hover {
+  background: color-mix(in srgb, var(--color-gold-wash) 50%, transparent);
+}
+
+/* ---------- Modal (components/ui/Modal.tsx) ---------- */
+
+dialog {
+  animation: modal-in 0.15s ease-out;
+}
+dialog::backdrop {
+  animation: backdrop-in 0.15s ease-out;
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog,
+  dialog::backdrop {
+    animation: none;
+  }
+}

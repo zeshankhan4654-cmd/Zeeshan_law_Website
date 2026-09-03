@@ -13,7 +13,7 @@ export class ApiError extends Error {
 /**
  * A thin fetch wrapper: JSON in, JSON out, and every non-2xx response becomes
  * a thrown ApiError with the server's own message rather than a generic one.
- * `credentials: "include"` carries the auth cookie once Phase 1 adds it.
+ * `credentials: "include"` carries the auth cookie.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
@@ -28,6 +28,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiError(res.status, body.error ?? "Request failed.");
+  }
+
+  // 204 No Content (logout, change-password) has no body to parse.
+  if (res.status === 204) {
+    return undefined as T;
   }
 
   return res.json() as Promise<T>;

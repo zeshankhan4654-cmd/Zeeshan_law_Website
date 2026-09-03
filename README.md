@@ -85,6 +85,38 @@ liability, not a feature.
   (`backend/src/lib/login-throttle.ts`), scoped by identity **and** IP so one
   bad actor doesn't lock out everyone else signing in from elsewhere.
 
+## Design system & the office shell
+
+`frontend/src/components/ui/` holds the primitives every later phase builds
+pages from — Button, Card, Field, Badge, Table, Modal, Spinner, Skeleton —
+each reading its colors and radii from the brand tokens in `globals.css`
+rather than one-off values. The Modal is built on the native `<dialog>`
+element (focus trapping, Escape-to-close and the backdrop all come from the
+browser), so no dialog/overlay dependency was needed.
+
+Three shells:
+
+- **`(public)`** — the header, nav and footer every marketing page will sit
+  inside once Phase 3 writes their real content.
+- **`office/login`** and **`office/change-password`** — outside the
+  protected shell, reachable even by an account that still owes a password
+  change.
+- **`office/(protected)`** — the sidebar shell. Its `layout.tsx` is a Server
+  Component that calls `getSessionUser()` **before anything renders**: no
+  cookie → redirect to login; a pending password change → redirect there;
+  otherwise render `OfficeShell` with the signed-in user. This is a real
+  gate, not a client-side check that flashes protected content first — it
+  works with JavaScript disabled, and was verified with a fresh browser
+  session hitting `/office` directly.
+
+The sidebar nav (`frontend/src/lib/office-nav.ts`) is capability-driven, the
+same way the old PHP app's was: each item optionally names a capability, and
+`canSeeNavItem()` hides it unless the signed-in user's role holds that
+capability (or the role is `admin`, which sees everything). Verified with two
+real accounts — the Principal saw the full sidebar, and a Colleague account
+saw Money and Website sections disappear entirely and Office reduced to just
+Enquiries, matching `role_caps` exactly.
+
 ## Conventions
 
 - **TypeScript everywhere**, `strict: true`. No `any` without a comment
@@ -109,7 +141,9 @@ liability, not a feature.
 
 - [x] **Phase 0** — monorepo scaffold, tooling, walking skeleton
 - [x] **Phase 1** — Postgres schema (Prisma, 21 tables) + authentication & roles
-- [ ] Phase 2 — design system: shared UI primitives, app shells
+- [x] **Phase 2** — design system, shared UI primitives, office login &
+      protected shell (client shell deferred to Phase 4, once client-portal
+      auth exists to build it against)
 - [ ] Phase 3 — public marketing site
 - [ ] Phase 4 — client portal + login flows
 - [ ] Phase 5 — office core (cases, clients, money, diary)
