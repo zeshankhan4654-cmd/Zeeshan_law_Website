@@ -1,0 +1,21 @@
+{
+  "name": "zeeshan-law-website",
+  "private": true,
+  "version": "0.0.0",
+  "description": "The Arbitrator & Law Associates — public website, client portal and office system.",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "build:backend": "npm run build -w backend",
+    "build:frontend": "npm run build -w frontend",
+    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend"
+  }
+}

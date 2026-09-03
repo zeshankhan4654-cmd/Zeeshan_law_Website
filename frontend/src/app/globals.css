@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/**
+ * Brand tokens — the single source of every color, font and radius used
+ * across the site. Every later phase reads from these instead of picking
+ * one-off values, so the palette stays consistent from the homepage to the
+ * office dashboard.
+ */
+@theme {
+  /* Ink — near-black, for text and dark surfaces */
+  --color-ink: #17140f;
+  --color-ink-soft: #4b443a;
+
+  /* Gold — the firm's accent */
+  --color-gold: #9a7622;
+  --color-gold-bright: #b58e32;
+  --color-gold-wash: #f7f0de;
+
+  /* Neutral ground */
+  --color-ground: #faf8f5;
+  --color-surface: #ffffff;
+  --color-rule: #e4ddd0;
+
+  /* Semantic */
+  --color-success: #2e6042;
+  --color-success-wash: #e9f1eb;
+  --color-danger: #8e2f1f;
+  --color-danger-wash: #fdecea;
+
+  /* Bound to next/font-loaded, self-hosted fonts — see app/layout.tsx */
+  --font-display: var(--font-newsreader-loaded), ui-serif, Georgia, serif;
+  --font-sans: var(--font-archivo-loaded), ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "Amiri", "Traditional Arabic", serif;
+
+  --radius-card: 6px;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink-soft);
+  font-family: var(--font-sans);
+}

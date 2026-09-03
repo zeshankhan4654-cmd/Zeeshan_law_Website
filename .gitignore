@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+
+# Build output
+backend/dist/
+frontend/build/
+
+# Prisma
+backend/prisma/migrations/dev.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.pem
+
+# TypeScript incremental build info
+*.tsbuildinfo
