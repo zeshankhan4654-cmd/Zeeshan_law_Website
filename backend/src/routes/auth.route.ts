@@ -12,6 +12,17 @@ import { changePasswordSchema, loginSchema } from "../validation/auth.schema.js"
 
 export const authRouter = Router();
 
+/**
+ * The capability keys a role holds, or null for the Principal — who holds
+ * everything, so the client treats null as "all" rather than being sent a
+ * list that could fall out of step with requireCap.
+ */
+async function capabilitiesOf(role: string): Promise<string[] | null> {
+  if (role === ROOT_ROLE) return null;
+  const grants = await prisma.roleCap.findMany({ where: { roleKey: role } });
+  return grants.map((g) => g.cap);
+}
+
 const LOGIN_SCOPE = "office";
 
 authRouter.post(
@@ -37,6 +48,7 @@ authRouter.post(
     await clearFailures(LOGIN_SCOPE, username, ip);
 
     const token = signSession({ kind: "staff", sub: user.id, username: user.username, role: user.role });
+    const capabilities = await capabilitiesOf(user.role);
 
     // The cookie serves the web app. The token in the body serves the mobile
     // app, which has no cookie jar and stores it in the device keychain.
@@ -50,6 +62,7 @@ authRouter.post(
       fullName: user.fullName,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      capabilities,
       token,
     });
   })
@@ -69,18 +82,13 @@ authRouter.get(
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }
 
-    const capKeys =
-      user.role === ROOT_ROLE
-        ? null // the Principal holds everything; the client treats null as "all"
-        : (await prisma.roleCap.findMany({ where: { roleKey: user.role } })).map((r) => r.cap);
-
     res.json({
       id: user.id,
       username: user.username,
       fullName: user.fullName,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
-      capabilities: capKeys,
+      capabilities: await capabilitiesOf(user.role),
     });
   })
 );

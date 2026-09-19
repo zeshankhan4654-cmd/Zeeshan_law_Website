@@ -140,8 +140,14 @@ and prints it **once** — only a bcrypt hash is stored, so it cannot be shown
 again; run it again to issue a fresh one. The client is made to choose their
 own password before they can go any further.
 
-To see the portal doing its job before Phase 5 builds the office screens that
-create real cases, there is one worked example:
+A chamber account is issued the same way, with the role it is to hold:
+
+```bash
+npm run staff:issue -- "Naveed Ahmad" associate
+```
+
+To see the portal and the diary doing their job before Phase 5 builds the
+office screens that create real cases, there is one worked example:
 
 ```bash
 npm run demo:data -- "Fazal ur Rehman"
@@ -150,7 +156,9 @@ npm run demo:data -- "Fazal ur Rehman"
 Everything it writes is labelled `[DEMO]`, it refuses to run with
 `NODE_ENV=production`, and re-running it replaces its own rows. It
 deliberately includes an internal case note, an internal hearing outcome and
-an unshared document — none of which should ever appear in the app.
+an unshared document — none of which should ever appear in the client's app —
+and lists three further matters so the staff cause list has something on it,
+one of them today.
 
 ## Design system & the office shell
 
@@ -228,7 +236,7 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
       searchable; judgments await verified citations)
 - [x] **A2** — sign-in for clients and staff, tokens in the device keychain
 - [x] **A3** — client tier: cases, hearings, documents, native voice notes
-- [ ] A4 — staff tier: cause list and case files on the phone
+- [x] **A4** — staff tier: cause list and case files on the phone
 - [ ] A5 — push notifications for hearing dates and new messages
 - [x] **A6 (part)** — app icon, splash, EAS build profiles, installable
       preview APK. Store listings and privacy policy still to do, and are
@@ -255,6 +263,45 @@ On the phone, `app/(client)/_layout.tsx` is the counterpart to the web's
 Server Component gate: a deep link straight to `/cases/3`, or a token that
 expired in a pocket, lands on the sign-in screen instead of a spinner that
 never resolves. It is convenience — the API refuses the request either way.
+
+#### What the chamber sees
+
+`/api/office/...`, and the boundary is the opposite of the portal's. A client
+is limited by *whose* case it is; staff are limited by *what their role may
+do*. Money is the clearest case: a colleague can work a matter in full and
+never see a rupee of it.
+
+- `GET /diary` — the cause list, grouped by day. What the phone is actually
+  for: standing in a corridor at half past eight wanting to know what is
+  listed, where, and whose it is, with the client's number one tap away.
+- `GET /cases`, `GET /cases/:id` — every matter, working notes included.
+- `POST /cases/:id/updates` — a progress note the client sees.
+- `POST /hearings/:id/outcome` — what happened. Internal, always.
+- `POST /cases/:id/messages` — answering a client, which marks their
+  outstanding questions on that case answered in the same transaction.
+- `GET /messages/unanswered` — the list that ought to be empty.
+
+`requireCap` decides what may be *done*; where a capability decides what to
+*include* instead, the route asks `holdsCap` and omits the section. The app
+hides a control the role does not hold, but that is a courtesy to the person
+— the server checks the same capability on every request either way.
+
+These routes are not mobile-specific: Phase 5's web office is built on them.
+
+Verified across three roles against one case file:
+
+| | Principal | Colleague | a custom "Reader" role |
+|---|---|---|---|
+| Open the file | yes | yes | yes |
+| Chamber's own note | yes | yes | yes |
+| Fees | yes | **no** | **no** |
+| Record an outcome | yes | yes | **no** |
+| Post a client update | yes | yes | **no** |
+| Answer a client | yes | yes | **no** |
+
+The Reader role was made by hand, holding `cases.view` and nothing else —
+which is the schema's claim that a role of the chamber's own making is as
+real as a shipped one, actually tested.
 
 #### Voice notes
 
