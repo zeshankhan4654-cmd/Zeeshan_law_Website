@@ -176,13 +176,30 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
 - [ ] A3 — client tier: cases, hearings, documents, native voice notes
 - [ ] A4 — staff tier: cause list and case files on the phone
 - [ ] A5 — push notifications for hearing dates and new messages
-- [ ] A6 — icons, splash, store listings, EAS build config
+- [ ] A6 — store listings, EAS build config, privacy policy
+      (app icon and splash done early — see below)
 
 **On Apple's review.** App Store guideline 4.2 rejects apps that are only a
 wrapped website. The searchable library, offline case files, native voice
 recording and push notifications are what carry the app past that bar — they
 are the point of building native at all, not extras to add later if there is
 time.
+
+#### The app icon
+
+`mobile/assets/` holds the launcher icon, the Android adaptive-icon
+foreground, the splash mark and the web favicon — the same scales of justice
+as the website, in brand gold on ink, drawn from the same 120-unit grid as
+`logo.svg` so the mark on the phone is the mark on the site. Regenerate them
+with `scripts/make-icons.php` if the mark ever changes.
+
+The Android foreground is kept well inside the safe zone, because launchers
+crop an adaptive icon to a circle or squircle and anything near the edge is
+cut off.
+
+**You will not see this icon in Expo Go.** Expo Go is a container running
+your JavaScript, so it shows its own icon. Yours appears only in a real
+standalone build (`eas build`), which is phase A6.
 
 #### Running the app
 
