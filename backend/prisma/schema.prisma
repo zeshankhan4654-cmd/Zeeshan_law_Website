@@ -85,6 +85,9 @@ model Client {
   portalEnabled   Boolean  @default(false) @map("portal_enabled")
   portalUsername  String?  @unique @map("portal_username")
   portalHash      String?  @map("portal_hash")
+  /// Set when the office issues or resets a portal password; the portal
+  /// refuses every other route until the client has chosen their own.
+  portalMustChangePassword Boolean @default(false) @map("portal_must_change_password")
   portalShowFees  Boolean  @default(false) @map("portal_show_fees")
   notes           String   @default("")
   createdAt       DateTime @default(now()) @map("created_at")

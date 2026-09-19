@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "portal:issue": "tsx scripts/issue-portal-login.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

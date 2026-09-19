@@ -5,7 +5,7 @@ import { signSession, SESSION_COOKIE, sessionCookieOptions } from "../lib/jwt.js
 import { clearFailures, lockMinutesRemaining, recordFailure } from "../lib/login-throttle.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireStaff, staffSession } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
 import { changePasswordSchema, loginSchema } from "../validation/auth.schema.js";
@@ -36,7 +36,7 @@ authRouter.post(
 
     await clearFailures(LOGIN_SCOPE, username, ip);
 
-    const token = signSession({ sub: user.id, username: user.username, role: user.role });
+    const token = signSession({ kind: "staff", sub: user.id, username: user.username, role: user.role });
 
     // The cookie serves the web app. The token in the body serves the mobile
     // app, which has no cookie jar and stores it in the device keychain.
@@ -62,9 +62,9 @@ authRouter.post("/logout", (_req, res) => {
 
 authRouter.get(
   "/me",
-  requireAuth,
+  requireStaff,
   asyncHandler(async (req, res) => {
-    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    const user = await prisma.user.findUnique({ where: { id: staffSession(req).sub } });
     if (!user) {
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }
@@ -87,12 +87,12 @@ authRouter.get(
 
 authRouter.post(
   "/change-password",
-  requireAuth,
+  requireStaff,
   validate(changePasswordSchema),
   asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
 
-    const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+    const user = await prisma.user.findUnique({ where: { id: staffSession(req).sub } });
     if (!user) {
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }

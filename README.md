@@ -98,6 +98,48 @@ liability, not a feature.
   (`backend/src/lib/login-throttle.ts`), scoped by identity **and** IP so one
   bad actor doesn't lock out everyone else signing in from elsewhere.
 
+### Two audiences, two kinds of session
+
+Staff are rows in `users`; clients are rows in `clients`. Their ids overlap —
+user 1 and client 1 both exist — so a session token carries the **kind** of
+party it belongs to, and `SessionPayload` is a discriminated union rather than
+a shared shape with an optional field. TypeScript then refuses `session.role`
+on a client session, and a staff-only check cannot be written against a client
+token by accident.
+
+| | Office | Client portal |
+|---|---|---|
+| Sign in at | `POST /api/auth/login` | `POST /api/portal/login` |
+| Guard | `requireStaff` | `requireClient` |
+| Browser cookie | `session` | `portal_session` |
+| Throttle scope | `office` | `client` |
+| Holds capabilities | yes, via its role | never — access follows from whose case it is |
+
+Presenting a client token to a staff route is a 403, and the reverse likewise.
+There is deliberately **no "any signed-in party" guard**: every protected route
+has to name the audience it serves, so none can be left open to both by
+omission. A token in the pre-A2 shape, with no kind at all, is refused —
+failing closed costs one sign-in, whereas guessing would hand a client a staff
+session.
+
+Two separate cookies matter for the browser: signing into the client portal in
+the same browser must not sign you out of the office.
+
+### Issuing a client a sign-in
+
+There is no self-registration. Until Phase 5 puts this behind the Clients
+screen, portal credentials are issued from the command line:
+
+```bash
+cd backend
+npm run portal:issue -- "Fazal ur Rehman"
+```
+
+It creates the client if needed, switches the portal on, generates a password
+and prints it **once** — only a bcrypt hash is stored, so it cannot be shown
+again; run it again to issue a fresh one. The client is made to choose their
+own password before they can go any further.
+
 ## Design system & the office shell
 
 `frontend/src/components/ui/` holds the primitives every later phase builds
@@ -172,7 +214,7 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
 - [x] **A0** — Expo app, brand tokens, navigation, talking to the live API
 - [x] **A1** — Bearer-token auth on the API + the public Library (research
       searchable; judgments await verified citations)
-- [ ] A2 — login for staff and clients, tokens in the device keychain
+- [x] **A2** — sign-in for clients and staff, tokens in the device keychain
 - [ ] A3 — client tier: cases, hearings, documents, native voice notes
 - [ ] A4 — staff tier: cause list and case files on the phone
 - [ ] A5 — push notifications for hearing dates and new messages
@@ -180,6 +222,21 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
       preview APK. Store listings and privacy policy still to do, and are
       only needed for Play Store / App Store submission, not for the
       preview build.
+
+#### How the phone holds a session
+
+React Native has no cookie jar, so the app keeps its token in the platform
+keychain — Keychain Services on iOS, Keystore-backed encrypted preferences on
+Android — via `expo-secure-store`, and presents it as `Authorization: Bearer`.
+Same token, same signature, same expiry as the web's cookie; only the envelope
+differs. It is restored on launch and re-checked against `/me`, so a token the
+office has since revoked resolves to "signed out" rather than a broken screen.
+Signing out drops the token *and* clears the TanStack Query cache, so nothing
+fetched as one identity can be shown to the next.
+
+`expo-secure-store` has no web implementation, so `expo start --web` falls back
+to `localStorage`. That is a genuinely weaker store and is used only in
+development, never in a shipped build.
 
 **On Apple's review.** App Store guideline 4.2 rejects apps that are only a
 wrapped website. The searchable library, offline case files, native voice
