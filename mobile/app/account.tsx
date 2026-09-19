@@ -1,13 +1,11 @@
 import { useRouter } from "expo-router";
 import {
   AlertTriangle,
-  Banknote,
   Briefcase,
   CalendarDays,
   FolderOpen,
   KeyRound,
   LogOut,
-  MessageSquare,
   User,
 } from "lucide-react-native";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
@@ -113,23 +111,9 @@ export default function AccountScreen() {
           <Row
             icon={<FolderOpen size={20} color="#9a7622" />}
             title="Your cases"
-            subtitle="Hearings, progress and documents — arriving next"
-            disabled
+            subtitle="Hearings, progress, documents and questions"
+            onPress={() => router.push("/cases")}
           />
-          <Row
-            icon={<MessageSquare size={20} color="#9a7622" />}
-            title="Ask the office"
-            subtitle="Questions and voice notes on your case — arriving next"
-            disabled
-          />
-          {account.showFees && (
-            <Row
-              icon={<Banknote size={20} color="#9a7622" />}
-              title="Fees"
-              subtitle="What is agreed and what is received — arriving next"
-              disabled
-            />
-          )}
         </View>
       ) : (
         <View className="gap-2">

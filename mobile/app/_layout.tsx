@@ -28,6 +28,9 @@ export default function RootLayout() {
             <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
             <Stack.Screen name="account" options={{ title: "Your account" }} />
             <Stack.Screen name="change-password" options={{ title: "Password" }} />
+            {/* The client tier carries its own header, from its own gated
+                layout — see app/(client)/_layout.tsx. */}
+            <Stack.Screen name="(client)" options={{ headerShown: false }} />
           </Stack>
         </SessionProvider>
       </QueryProvider>

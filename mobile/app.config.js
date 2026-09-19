@@ -48,7 +48,19 @@ module.exports = {
     output: "single",
     favicon: "./assets/favicon.png",
   },
-  plugins: ["expo-router", "expo-secure-store"],
+  plugins: [
+    "expo-router",
+    "expo-secure-store",
+    [
+      "expo-av",
+      {
+        // Shown in the system permission dialogue, so it has to say why in
+        // the client's terms rather than the app's.
+        microphonePermission:
+          "Allow the chamber to use the microphone so you can send a spoken note about your case.",
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },
