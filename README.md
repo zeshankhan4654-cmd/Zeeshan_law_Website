@@ -176,8 +176,10 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
 - [ ] A3 — client tier: cases, hearings, documents, native voice notes
 - [ ] A4 — staff tier: cause list and case files on the phone
 - [ ] A5 — push notifications for hearing dates and new messages
-- [ ] A6 — store listings, EAS build config, privacy policy
-      (app icon and splash done early — see below)
+- [x] **A6 (part)** — app icon, splash, EAS build profiles, installable
+      preview APK. Store listings and privacy policy still to do, and are
+      only needed for Play Store / App Store submission, not for the
+      preview build.
 
 **On Apple's review.** App Store guideline 4.2 rejects apps that are only a
 wrapped website. The searchable library, offline case files, native voice
@@ -200,6 +202,49 @@ cut off.
 **You will not see this icon in Expo Go.** Expo Go is a container running
 your JavaScript, so it shows its own icon. Yours appears only in a real
 standalone build (`eas build`), which is phase A6.
+
+#### Getting a real installable APK on your phone
+
+Expo Go is fine for looking at the app, but it shows Expo's icon and needs
+the dev server running. A **preview build** is a real `.apk` you install and
+keep — with your own icon on the home screen.
+
+**This costs nothing and needs no Google Play account.** Only publishing to
+the Play Store needs the $25 registration; a preview build is distributed
+internally, straight from a download link.
+
+You need a free Expo account (expo.dev), and the build runs on Expo's
+servers — it cannot be produced from inside this repository alone.
+
+```bash
+cd mobile
+
+npm run lan-ip          # prints this computer's address on your wifi
+```
+
+Put the address it prints into `mobile/eas.json`, under
+`build.preview.env.EXPO_PUBLIC_API_URL`. Then:
+
+```bash
+npx eas login           # your free expo.dev account
+npx eas build:configure # first time only — links the project to your account
+npm run build:apk       # builds on Expo's servers, prints a download link
+```
+
+Open that link on the phone, install, done.
+
+**Three things that will otherwise waste an evening:**
+
+- **`localhost` is the phone.** A standalone build has no dev server to ask,
+  so the API address has to be your computer's wifi address — that is what
+  `npm run lan-ip` is for, and why `EXPO_PUBLIC_API_URL` is set per build
+  profile. `npm run dev:backend` now prints the same address on startup.
+- **Android blocks plain HTTP.** Since Android 9, `http://` is refused by
+  default and the request fails with nothing useful in the log.
+  `app.config.js` allows it — but only when the build profile is not
+  `production`, so a shipped build cannot go out with it enabled. Production
+  must reach the API over HTTPS.
+- **Phone and computer must be on the same wifi**, and the backend running.
 
 #### Running the app
 

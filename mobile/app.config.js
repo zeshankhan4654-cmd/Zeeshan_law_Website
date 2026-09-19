@@ -1,0 +1,55 @@
+/**
+ * Expo config, as JavaScript rather than app.json so one setting can depend
+ * on which profile is being built — see `usesCleartextTraffic` below.
+ */
+
+// EAS sets this during a cloud build; it is undefined when running locally.
+const profile = process.env.EAS_BUILD_PROFILE;
+const isProduction = profile === "production";
+
+/** @type {import('expo/config').ExpoConfig} */
+module.exports = {
+  name: "The Arbitrator & Law Associates",
+  slug: "arbitrator-law",
+  scheme: "arbitratorlaw",
+  version: "0.1.0",
+  orientation: "portrait",
+  userInterfaceStyle: "light",
+  newArchEnabled: true,
+  icon: "./assets/icon.png",
+  splash: {
+    image: "./assets/splash-icon.png",
+    resizeMode: "contain",
+    backgroundColor: "#17140F",
+  },
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: "com.arbitratorandlaw.app",
+  },
+  android: {
+    package: "com.arbitratorandlaw.app",
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#17140F",
+    },
+    /**
+     * Android has refused plain-HTTP traffic by default since Android 9.
+     * A test build talking to a laptop on the office wifi (http://192.168.x.x)
+     * needs this allowed, or every request fails with no useful error.
+     *
+     * It is derived from the build profile rather than hardcoded, so a
+     * production build cannot ship with cleartext enabled even if somebody
+     * forgets — production must reach the API over HTTPS.
+     */
+    usesCleartextTraffic: !isProduction,
+  },
+  web: {
+    bundler: "metro",
+    output: "single",
+    favicon: "./assets/favicon.png",
+  },
+  plugins: ["expo-router", "expo-secure-store"],
+  experiments: {
+    typedRoutes: true,
+  },
+};
