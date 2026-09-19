@@ -1,69 +1,105 @@
-import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, CircleCheck, LoaderCircle, Scale } from "lucide-react-native";
-import { ScrollView, Text, View } from "react-native";
-import { apiFetch, API_URL } from "@/lib/api";
+import { useRouter } from "expo-router";
+import { BookOpen, Gavel, Phone, Scale, Video } from "lucide-react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useLibraryCounts } from "@/lib/library";
 
-type HealthResponse = { status: "ok"; database: "connected" };
+function Tile({
+  icon,
+  title,
+  subtitle,
+  count,
+  onPress,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  count?: number;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      className={`flex-row items-center gap-3 rounded-card border border-rule bg-surface px-4 py-4 ${
+        disabled ? "opacity-50" : "active:bg-gold-wash"
+      }`}
+    >
+      <View className="size-10 items-center justify-center rounded-card bg-gold-wash">{icon}</View>
+      <View className="flex-1">
+        <Text className="text-base font-semibold text-ink">{title}</Text>
+        <Text className="text-sm text-ink-soft">{subtitle}</Text>
+      </View>
+      {count !== undefined && (
+        <View className="rounded-full bg-gold-wash px-2.5 py-1">
+          <Text className="text-xs font-semibold text-gold">{count}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
 
-/**
- * A0's proof of life: the app renders with the brand tokens, and reaches the
- * same Express API the website uses. Real screens arrive in A1 onward.
- */
 export default function Home() {
-  const { data, isPending, isError, error } = useQuery({
-    queryKey: ["health"],
-    queryFn: () => apiFetch<HealthResponse>("/api/health"),
-  });
+  const router = useRouter();
+  const { data: counts } = useLibraryCounts();
 
   return (
-    <ScrollView contentContainerClassName="flex-1 items-center justify-center gap-6 px-6 py-16">
-      <View className="size-16 items-center justify-center rounded-card bg-gold-wash">
-        <Scale size={32} color="#9a7622" strokeWidth={1.5} />
-      </View>
-
-      <View className="items-center gap-2">
-        <Text className="text-xs font-semibold uppercase tracking-[2px] text-gold">
-          Phase A0 — walking skeleton
-        </Text>
-        <Text className="text-center text-2xl font-semibold text-ink">
+    <ScrollView contentContainerClassName="gap-6 px-5 py-8">
+      <View className="items-center gap-3">
+        <View className="size-16 items-center justify-center rounded-card bg-gold-wash">
+          <Scale size={32} color="#9a7622" strokeWidth={1.5} />
+        </View>
+        <Text className="text-center text-xl font-semibold text-ink">
           The Arbitrator &amp; Law Associates
         </Text>
-        <Text className="text-center text-base text-ink-soft">
-          Advocates, Arbitrators &amp; Legal Consultants
+        <Text className="text-center text-sm text-ink-soft">
+          Advocates, Arbitrators &amp; Legal Consultants · Peshawar High Court
         </Text>
       </View>
 
-      <View className="w-full rounded-card border border-rule bg-surface px-4 py-3">
-        {isPending && (
-          <View className="flex-row items-center gap-2">
-            <LoaderCircle size={16} color="#9a7622" />
-            <Text className="text-sm text-ink-soft">Reaching the API…</Text>
-          </View>
-        )}
-        {isError && (
-          <View className="flex-row items-start gap-2">
-            <CircleAlert size={16} color="#8e2f1f" />
-            <View className="flex-1">
-              <Text className="text-sm text-danger">
-                {error instanceof Error ? error.message : "API unreachable."}
-              </Text>
-              <Text className="mt-1 text-xs text-ink-soft">Tried {API_URL}</Text>
-            </View>
-          </View>
-        )}
-        {data && (
-          <View className="flex-row items-center gap-2">
-            <CircleCheck size={16} color="#2e6042" />
-            <Text className="text-sm text-ink-soft">
-              API {data.status} · database {data.database}
-            </Text>
-          </View>
-        )}
+      <View className="gap-2">
+        <Text className="text-xs font-semibold uppercase tracking-[2px] text-gold">
+          The library — open to all
+        </Text>
+        <Tile
+          icon={<BookOpen size={20} color="#9a7622" />}
+          title="Legal research"
+          subtitle="Articles on limitation, arbitration, bail and more"
+          count={counts?.research}
+          onPress={() => router.push("/library")}
+        />
+        <Tile
+          icon={<Gavel size={20} color="#9a7622" />}
+          title="Judgments"
+          subtitle="Reported decisions of the superior courts"
+          count={counts?.judgments}
+          onPress={() => router.push("/library/judgments")}
+        />
+        <Tile
+          icon={<Video size={20} color="#9a7622" />}
+          title="Videos &amp; lectures"
+          subtitle="Recorded material from the chamber"
+          count={counts?.media}
+          disabled
+        />
       </View>
 
-      <Text className="text-center text-xs text-ink-soft">
-        Next: the Library — searchable judgments and legal research, open to
-        anyone, no sign-in.
+      <View className="gap-2">
+        <Text className="text-xs font-semibold uppercase tracking-[2px] text-gold">
+          Coming next
+        </Text>
+        <Tile
+          icon={<Phone size={20} color="#9a7622" />}
+          title="Sign in"
+          subtitle="Clients and chamber staff — arriving in the next release"
+          disabled
+        />
+      </View>
+
+      <Text className="px-2 text-center text-xs leading-5 text-ink-soft">
+        Material in this library is general information, not legal advice on
+        your matter.
       </Text>
     </ScrollView>
   );

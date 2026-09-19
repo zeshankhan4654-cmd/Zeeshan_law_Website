@@ -17,7 +17,10 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: "#faf8f5" },
           }}
         >
-          <Stack.Screen name="index" options={{ title: "The Arbitrator & Law Associates" }} />
+          <Stack.Screen name="index" options={{ title: "The Chamber" }} />
+          <Stack.Screen name="library/index" options={{ title: "Legal Research" }} />
+          <Stack.Screen name="library/judgments" options={{ title: "Judgments" }} />
+          <Stack.Screen name="library/[id]" options={{ title: "", headerBackTitle: "Library" }} />
         </Stack>
       </QueryProvider>
     </SafeAreaProvider>

@@ -22,3 +22,23 @@ export function validate(schema: ObjectSchema) {
     next();
   };
 }
+
+/**
+ * The same, for `req.query`. Express 5 makes `req.query` a getter, so the
+ * validated value is stashed on `res.locals.query` rather than assigned back
+ * over it — handlers read it from there.
+ */
+export function validateQuery(schema: ObjectSchema) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const { error, value } = schema.validate(req.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error) {
+      next(new ApiError(400, error.details.map((d) => d.message).join("; ")));
+      return;
+    }
+    res.locals.query = value;
+    next();
+  };
+}

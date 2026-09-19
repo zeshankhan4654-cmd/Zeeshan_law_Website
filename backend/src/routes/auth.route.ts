@@ -37,6 +37,12 @@ authRouter.post(
     await clearFailures(LOGIN_SCOPE, username, ip);
 
     const token = signSession({ sub: user.id, username: user.username, role: user.role });
+
+    // The cookie serves the web app. The token in the body serves the mobile
+    // app, which has no cookie jar and stores it in the device keychain.
+    // A browser client should ignore it and rely on the httpOnly cookie —
+    // putting a token where JavaScript can read it is only worth doing where
+    // there is no alternative.
     res.cookie(SESSION_COOKIE, token, sessionCookieOptions);
     res.json({
       id: user.id,
@@ -44,6 +50,7 @@ authRouter.post(
       fullName: user.fullName,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      token,
     });
   })
 );

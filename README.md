@@ -170,7 +170,8 @@ audiences: the public (a searchable case-law library, open to any lawyer —
 no sign-in), clients (their own cases), and staff (the diary, at court).
 
 - [x] **A0** — Expo app, brand tokens, navigation, talking to the live API
-- [ ] A1 — Bearer-token auth on the API + the public Library
+- [x] **A1** — Bearer-token auth on the API + the public Library (research
+      searchable; judgments await verified citations)
 - [ ] A2 — login for staff and clients, tokens in the device keychain
 - [ ] A3 — client tier: cases, hearings, documents, native voice notes
 - [ ] A4 — staff tier: cause list and case files on the phone

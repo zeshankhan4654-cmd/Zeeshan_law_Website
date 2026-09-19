@@ -7,6 +7,7 @@ import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { authRouter } from "./routes/auth.route.js";
 import { healthRouter } from "./routes/health.route.js";
+import { libraryRouter } from "./routes/library.route.js";
 
 export function createApp(): Express {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp(): Express {
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", authRouter);
+  app.use("/api/library", libraryRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

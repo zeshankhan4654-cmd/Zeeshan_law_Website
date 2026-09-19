@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
+import { RESEARCH_ARTICLES } from "./seed-data/research.js";
 
 const prisma = new PrismaClient();
 
@@ -69,6 +70,18 @@ async function main() {
     console.log('Seeded a first account: username "admin", password "admin123" — change it on first sign-in.');
   } else {
     console.log("An admin account already exists; skipped seeding one.");
+  }
+
+  // The chamber's opening library. Only seeded into an empty library, so a
+  // re-run never duplicates them or overwrites edits made in the office.
+  const existingResearch = await prisma.research.count();
+  if (existingResearch === 0) {
+    await prisma.research.createMany({
+      data: RESEARCH_ARTICLES.map((a) => ({ ...a, published: true })),
+    });
+    console.log(`Seeded ${RESEARCH_ARTICLES.length} legal research articles.`);
+  } else {
+    console.log("The research library already has entries; skipped seeding.");
   }
 
   console.log("Seed complete.");

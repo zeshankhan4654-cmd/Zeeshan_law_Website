@@ -14,9 +14,26 @@ declare global {
   }
 }
 
-/** Every request beyond this point must carry a valid session cookie. */
+/**
+ * The session token, from either transport.
+ *
+ * The web app holds it in an httpOnly cookie, which the browser sends on its
+ * own. React Native has no cookie jar, so the mobile app keeps the token in
+ * the device keychain and presents it as a bearer token. Same token, same
+ * signature, same expiry — only the envelope differs.
+ */
+function readSessionToken(req: Request): string | null {
+  const header = req.get("authorization");
+  if (header?.startsWith("Bearer ")) {
+    const token = header.slice("Bearer ".length).trim();
+    if (token) return token;
+  }
+  return req.cookies?.[SESSION_COOKIE] ?? null;
+}
+
+/** Every request beyond this point must carry a valid session. */
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
-  const token = req.cookies?.[SESSION_COOKIE];
+  const token = readSessionToken(req);
   if (!token) {
     throw new ApiError(401, "Sign in to continue.");
   }
