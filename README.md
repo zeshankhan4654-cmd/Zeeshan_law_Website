@@ -23,10 +23,23 @@ working increment.
 ```
 backend/     Express API — src/routes, src/middleware, src/lib, prisma/
 frontend/    Next.js app — src/app (routes), src/lib, src/components
+mobile/      Expo / React Native app — app (routes), src/lib
 ```
 
-Two npm workspaces under one root `package.json`. No Lerna/Turborepo — the
-project doesn't need that weight yet.
+`backend` and `frontend` are npm workspaces under the root `package.json`.
+No Lerna/Turborepo — the project doesn't need that weight yet.
+
+**`mobile` is deliberately *not* a workspace.** React Native 0.76 requires
+React 18.3.1 while the Next.js app requires React 19, so the two cannot share
+a hoisted dependency tree — npm ends up nesting Expo's own packages where
+Expo's Metro config can't resolve them. The mobile app installs its own
+`node_modules` instead. It shares no code with the web app, only the HTTP API
+contract, so nothing is lost by keeping the trees separate.
+
+```bash
+npm install                  # backend + frontend
+npm run install:mobile       # mobile, separately
+```
 
 ## Running it locally
 
@@ -149,3 +162,34 @@ Enquiries, matching `role_caps` exactly.
 - [ ] Phase 5 — office core (cases, clients, money, diary)
 - [ ] Phase 6 — office content tools (blog, reviews, settings, roles)
 - [ ] Phase 7 — hardening & deployment
+
+### The mobile app
+
+Android and iOS, built on Expo, against the same Express API. Three
+audiences: the public (a searchable case-law library, open to any lawyer —
+no sign-in), clients (their own cases), and staff (the diary, at court).
+
+- [x] **A0** — Expo app, brand tokens, navigation, talking to the live API
+- [ ] A1 — Bearer-token auth on the API + the public Library
+- [ ] A2 — login for staff and clients, tokens in the device keychain
+- [ ] A3 — client tier: cases, hearings, documents, native voice notes
+- [ ] A4 — staff tier: cause list and case files on the phone
+- [ ] A5 — push notifications for hearing dates and new messages
+- [ ] A6 — icons, splash, store listings, EAS build config
+
+**On Apple's review.** App Store guideline 4.2 rejects apps that are only a
+wrapped website. The searchable library, offline case files, native voice
+recording and push notifications are what carry the app past that bar — they
+are the point of building native at all, not extras to add later if there is
+time.
+
+#### Running the app
+
+```bash
+npm run dev:backend          # the API it talks to
+npm run dev:mobile           # Expo — scan the QR code with Expo Go
+```
+
+On a handset the API address is derived from whatever host Expo is served
+from, so scanning the QR code is enough; no configuration. Set
+`EXPO_PUBLIC_API_URL` to point somewhere else.

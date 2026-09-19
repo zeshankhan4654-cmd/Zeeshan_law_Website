@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "The Arbitrator & Law Associates",
+    "slug": "arbitrator-law",
+    "scheme": "arbitratorlaw",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#17140F"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.arbitratorandlaw.app"
+    },
+    "android": {
+      "package": "com.arbitratorandlaw.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#17140F"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -12,8 +12,10 @@ const schema = Joi.object({
 
   DATABASE_URL: Joi.string().uri({ scheme: ["postgresql", "postgres"] }).required(),
 
-  // The browser origin allowed to call this API (the Next.js dev server).
-  CORS_ORIGIN: Joi.string().uri().required(),
+  // Browser origins allowed to call this API, comma-separated: the Next.js
+  // app, and Expo's web target during mobile development. A native build
+  // sends no Origin header and is not subject to CORS at all.
+  CORS_ORIGIN: Joi.string().required(),
 
   // Signs and verifies the session cookie. Generate a real value with:
   //   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
@@ -36,7 +38,10 @@ export const env = {
   nodeEnv: value.NODE_ENV as "development" | "test" | "production",
   isProduction: value.NODE_ENV === "production",
   databaseUrl: value.DATABASE_URL as string,
-  corsOrigin: value.CORS_ORIGIN as string,
+  corsOrigins: (value.CORS_ORIGIN as string)
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
   jwt: {
     secret: value.JWT_SECRET as string,
     expiresIn: value.JWT_EXPIRES_IN as string,

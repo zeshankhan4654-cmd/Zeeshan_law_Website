@@ -32,3 +32,8 @@ npm-debug.log*
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Expo
+mobile/.expo/
+mobile/dist/
+mobile/expo-env.d.ts

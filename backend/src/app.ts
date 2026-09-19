@@ -17,7 +17,7 @@ export function createApp(): Express {
 
   app.use(
     cors({
-      origin: env.corsOrigin,
+      origin: env.corsOrigins,
       credentials: true, // lets the session cookie travel with cross-origin requests
     })
   );
