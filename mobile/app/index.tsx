@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
-import { BookOpen, Gavel, Phone, Scale, Video } from "lucide-react-native";
+import { BookOpen, Gavel, LogIn, Scale, UserCircle, Video } from "lucide-react-native";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLibraryCounts } from "@/lib/library";
+import { useSession } from "@/lib/session";
 
 function Tile({
   icon,
@@ -43,6 +44,7 @@ function Tile({
 export default function Home() {
   const router = useRouter();
   const { data: counts } = useLibraryCounts();
+  const session = useSession();
 
   return (
     <ScrollView contentContainerClassName="gap-6 px-5 py-8">
@@ -87,14 +89,29 @@ export default function Home() {
 
       <View className="gap-2">
         <Text className="text-xs font-semibold uppercase tracking-[2px] text-gold">
-          Coming next
+          Clients &amp; chamber
         </Text>
-        <Tile
-          icon={<Phone size={20} color="#9a7622" />}
-          title="Sign in"
-          subtitle="Clients and chamber staff — arriving in the next release"
-          disabled
-        />
+        {session.status === "signed-in" ? (
+          <Tile
+            icon={<UserCircle size={20} color="#9a7622" />}
+            title="Your account"
+            subtitle={
+              session.account.kind === "client"
+                ? session.account.name
+                : `${session.account.fullName} · chamber staff`
+            }
+            onPress={() => router.push("/account")}
+          />
+        ) : (
+          <Tile
+            icon={<LogIn size={20} color="#9a7622" />}
+            title="Sign in"
+            subtitle="Clients of the firm and chamber staff"
+            // Nothing to press while the saved sign-in is still being read.
+            disabled={session.status === "loading"}
+            onPress={() => router.push("/sign-in")}
+          />
+        )}
       </View>
 
       <Text className="px-2 text-center text-xs leading-5 text-ink-soft">
