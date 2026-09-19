@@ -15,7 +15,16 @@ export type Audience = "client" | "staff";
 
 export type Account =
   | { kind: "client"; id: number; name: string; username: string; showFees: boolean; mustChangePassword: boolean }
-  | { kind: "staff"; id: number; fullName: string; username: string; role: string; mustChangePassword: boolean };
+  | {
+      kind: "staff";
+      id: number;
+      fullName: string;
+      username: string;
+      role: string;
+      mustChangePassword: boolean;
+      /** null means the Principal, who holds every capability. */
+      capabilities: string[] | null;
+    };
 
 type Stored = { kind: Audience; token: string };
 
@@ -38,7 +47,14 @@ const SessionContext = createContext<SessionValue | null>(null);
 const ROUTES: Record<Audience, string> = { client: "/api/portal", staff: "/api/auth" };
 
 type ClientMe = { id: number; name: string; username: string; showFees: boolean; mustChangePassword: boolean };
-type StaffMe = { id: number; fullName: string; username: string; role: string; mustChangePassword: boolean };
+type StaffMe = {
+  id: number;
+  fullName: string;
+  username: string;
+  role: string;
+  mustChangePassword: boolean;
+  capabilities: string[] | null;
+};
 type Me = ClientMe | StaffMe;
 
 /** Built field by field rather than spread, so the token never ends up
@@ -49,7 +65,15 @@ function toAccount(kind: Audience, data: Me): Account {
     return { kind, id: c.id, name: c.name, username: c.username, showFees: c.showFees, mustChangePassword: c.mustChangePassword };
   }
   const s = data as StaffMe;
-  return { kind, id: s.id, fullName: s.fullName, username: s.username, role: s.role, mustChangePassword: s.mustChangePassword };
+  return {
+    kind,
+    id: s.id,
+    fullName: s.fullName,
+    username: s.username,
+    role: s.role,
+    mustChangePassword: s.mustChangePassword,
+    capabilities: s.capabilities ?? null,
+  };
 }
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
@@ -149,6 +173,18 @@ export function useSession(): SessionValue {
   const value = useContext(SessionContext);
   if (!value) throw new Error("useSession must be used inside SessionProvider");
   return value;
+}
+
+/**
+ * Whether a signed-in staff member holds a capability.
+ *
+ * This decides what to *show*, never what is allowed: the server checks the
+ * same capability on every request, so hiding a button is a courtesy to the
+ * person, not a control on them.
+ */
+export function can(account: Account | null, cap: string): boolean {
+  if (account?.kind !== "staff") return false;
+  return account.capabilities === null || account.capabilities.includes(cap);
 }
 
 /** The bearer token for an authenticated request, or null when signed out. */

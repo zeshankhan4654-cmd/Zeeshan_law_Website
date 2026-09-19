@@ -123,14 +123,14 @@ export default function AccountScreen() {
           <Row
             icon={<CalendarDays size={20} color="#9a7622" />}
             title="Cause list"
-            subtitle="Today at court — arriving next"
-            disabled
+            subtitle="What is listed today and the fortnight ahead"
+            onPress={() => router.push("/diary")}
           />
           <Row
             icon={<FolderOpen size={20} color="#9a7622" />}
             title="Case files"
-            subtitle="The file in your pocket — arriving next"
-            disabled
+            subtitle="Search every matter in the chamber"
+            onPress={() => router.push("/files")}
           />
         </View>
       )}

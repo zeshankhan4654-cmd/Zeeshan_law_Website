@@ -31,6 +31,7 @@ export default function RootLayout() {
             {/* The client tier carries its own header, from its own gated
                 layout — see app/(client)/_layout.tsx. */}
             <Stack.Screen name="(client)" options={{ headerShown: false }} />
+            <Stack.Screen name="(staff)" options={{ headerShown: false }} />
           </Stack>
         </SessionProvider>
       </QueryProvider>
