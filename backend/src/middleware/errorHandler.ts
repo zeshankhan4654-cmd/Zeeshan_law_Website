@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { MulterError } from "multer";
 
 /** A known, expected failure — thrown deliberately with a status and a safe message. */
 export class ApiError extends Error {
@@ -26,6 +27,17 @@ export function notFoundHandler(req: Request, res: Response): void {
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof ApiError) {
     res.status(err.status).json({ error: err.message });
+    return;
+  }
+
+  // An upload that breaks a limit is the sender's business, not a server
+  // fault — say which limit, without describing the server.
+  if (err instanceof MulterError) {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "That recording is too long. Keep a voice note short."
+        : "That upload was not accepted.";
+    res.status(400).json({ error: message });
     return;
   }
 

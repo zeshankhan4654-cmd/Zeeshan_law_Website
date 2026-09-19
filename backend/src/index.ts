@@ -1,6 +1,9 @@
 import os from "node:os";
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
+import { ensureUploadDirs } from "./lib/uploads.js";
+
+ensureUploadDirs();
 
 const app = createApp();
 

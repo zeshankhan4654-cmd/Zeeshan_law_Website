@@ -22,6 +22,13 @@ const schema = Joi.object({
   JWT_SECRET: Joi.string().min(32).required(),
   JWT_EXPIRES_IN: Joi.string().default("12h"),
 
+  // Where uploaded case documents and client voice notes are written. Kept
+  // outside the repository tree in a real deployment.
+  UPLOAD_DIR: Joi.string().default("./uploads"),
+  // Largest voice note accepted, in megabytes. A note to the office is a
+  // sentence or two, not a recording of the hearing.
+  VOICE_NOTE_MAX_MB: Joi.number().min(1).max(50).default(10),
+
   // Failed sign-ins before an identity is locked out, and for how long.
   LOGIN_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
   LOGIN_LOCKOUT_MINUTES: Joi.number().integer().min(1).default(15),
@@ -46,6 +53,8 @@ export const env = {
     secret: value.JWT_SECRET as string,
     expiresIn: value.JWT_EXPIRES_IN as string,
   },
+  uploadDir: value.UPLOAD_DIR as string,
+  voiceNoteMaxBytes: (value.VOICE_NOTE_MAX_MB as number) * 1024 * 1024,
   login: {
     maxAttempts: value.LOGIN_MAX_ATTEMPTS as number,
     lockoutMinutes: value.LOGIN_LOCKOUT_MINUTES as number,

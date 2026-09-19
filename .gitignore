@@ -20,6 +20,10 @@ frontend/build/
 # Prisma
 backend/prisma/migrations/dev.db
 
+# Uploaded files — case documents and client voice notes. Real client
+# material never belongs in the repository.
+backend/uploads/
+
 # Logs
 *.log
 npm-debug.log*

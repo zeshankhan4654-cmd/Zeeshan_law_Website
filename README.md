@@ -140,6 +140,18 @@ and prints it **once** — only a bcrypt hash is stored, so it cannot be shown
 again; run it again to issue a fresh one. The client is made to choose their
 own password before they can go any further.
 
+To see the portal doing its job before Phase 5 builds the office screens that
+create real cases, there is one worked example:
+
+```bash
+npm run demo:data -- "Fazal ur Rehman"
+```
+
+Everything it writes is labelled `[DEMO]`, it refuses to run with
+`NODE_ENV=production`, and re-running it replaces its own rows. It
+deliberately includes an internal case note, an internal hearing outcome and
+an unshared document — none of which should ever appear in the app.
+
 ## Design system & the office shell
 
 `frontend/src/components/ui/` holds the primitives every later phase builds
@@ -215,13 +227,59 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
 - [x] **A1** — Bearer-token auth on the API + the public Library (research
       searchable; judgments await verified citations)
 - [x] **A2** — sign-in for clients and staff, tokens in the device keychain
-- [ ] A3 — client tier: cases, hearings, documents, native voice notes
+- [x] **A3** — client tier: cases, hearings, documents, native voice notes
 - [ ] A4 — staff tier: cause list and case files on the phone
 - [ ] A5 — push notifications for hearing dates and new messages
 - [x] **A6 (part)** — app icon, splash, EAS build profiles, installable
       preview APK. Store listings and privacy policy still to do, and are
       only needed for Play Store / App Store submission, not for the
       preview build.
+
+#### What a client can see
+
+`/api/portal/cases` and below. Three rules run through every route:
+
+1. **Ownership is part of the query, never a check afterwards.** Every lookup
+   carries `clientId` from the token in its `WHERE`, so there is no path that
+   fetches a row first and remembers to compare second.
+2. **A case that is not yours is 404, not 403.** A client should not be able
+   to learn that case 812 exists from the shape of the refusal.
+3. **Columns are listed, never spread.** `Case.notes` and `Hearing.outcome`
+   are the office's own working notes; a `select` that names its columns
+   cannot leak one added later either.
+
+Documents are private unless the office deliberately marked one Shared, and
+fees appear only for a client whose `portalShowFees` is on.
+
+On the phone, `app/(client)/_layout.tsx` is the counterpart to the web's
+Server Component gate: a deep link straight to `/cases/3`, or a token that
+expired in a pocket, lands on the sign-in screen instead of a spinner that
+never resolves. It is convenience — the API refuses the request either way.
+
+#### Voice notes
+
+A client walking out of court will say in twenty seconds what they would
+never sit down and type. That is the clearest reason this app is native
+rather than a wrapped website.
+
+Recordings are uploaded to `UPLOAD_DIR` under a **generated** name — a name
+that arrives with an upload can contain `../`, a null byte, or simply collide
+with someone else's file, so the original is kept in the database as a label
+rather than used as a path. Every read goes back through `resolveStoredPath`,
+which refuses anything landing outside the upload directory. Only audio types
+on an allow-list are written at all, the extension comes from that list rather
+than the filename, and `VOICE_NOTE_MAX_MB` (10 by default) caps the size — a
+note to the office is a sentence, not a recording of the hearing. An upload
+that is then found not to belong to the sender is deleted from disk again.
+
+`backend/uploads/` is git-ignored: real client material never belongs in the
+repository.
+
+**One limitation worth knowing.** On iOS and Android the player sends the
+bearer token with the media request, so a recording is as protected as
+everything else. The web target cannot — an HTML audio element has no way to
+carry headers — so playback fails there and says so. That affects
+`expo start --web` only, never a built app.
 
 #### How the phone holds a session
 
