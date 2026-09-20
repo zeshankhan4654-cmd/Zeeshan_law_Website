@@ -218,6 +218,35 @@ that test in instructive ways, and the comments in
 What ships is a CSS load-time fade with no scroll position and no script to
 wait on, skipped entirely for anyone who has asked for less motion.
 
+## The client portal
+
+At `/client`, gated the same way the office is: a Server Component reads
+the session **before anything renders**, so a visitor never sees a flash of
+somebody's case and it works with JavaScript disabled. It is a convenience,
+not the control — the API refuses every one of these requests without a
+valid client session regardless of what the page chooses to draw.
+
+A client sees their matters, one matter in full (progress, hearings, shared
+documents, and fees where the office has switched them on), and a thread for
+asking the office a question. The office's own working notes, unshared
+documents and hearing outcomes are absent, which the tests assert on the
+rendered page rather than only in the JSON.
+
+**Both audiences can be signed in at once in one browser.** The office holds
+`session` and the portal holds `portal_session`, so a solicitor signed into
+the office is *not* signed into the portal, signing into one does not
+disturb the other, and neither cookie authenticates at the other's
+endpoints. That was designed in phase A2 and is now actually exercised:
+the test signs into both in the same browser and checks each still works.
+
+**Voice notes work in the browser too**, through `MediaRecorder` — the same
+feature as the app, for a client at a laptop. Playback needs the cookie to
+ride with the media request, which takes `crossOrigin="use-credentials"` on
+the audio element and a credentialed CORS allowance on the API. Unlike the
+mobile app, this one could be tested properly: Chromium's fake audio device
+produced a real 29 KB recording, which was stored under a generated name and
+played back at 200 with the cookie and 401 without.
+
 ### Contact details are absent, not invented
 
 `SITE_DEFAULTS` in `backend/src/lib/site-settings.ts` ships the firm's name,
@@ -275,7 +304,7 @@ are human:
       protected shell (client shell deferred to Phase 4, once client-portal
       auth exists to build it against)
 - [x] **Phase 3** — public marketing site
-- [ ] Phase 4 — client portal + login flows
+- [x] **Phase 4** — client portal + login flows
 - [ ] Phase 5 — office core (cases, clients, money, diary)
 - [ ] Phase 6 — office content tools (blog, reviews, settings, roles)
 - [ ] Phase 7 — hardening & deployment
