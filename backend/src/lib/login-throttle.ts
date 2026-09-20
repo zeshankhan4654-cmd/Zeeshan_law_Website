@@ -10,7 +10,7 @@ import { env } from "../config/env.js";
 
 /** Minutes remaining before this identity may try again, or 0 if not locked. */
 export async function lockMinutesRemaining(scope: string, identity: string, ip: string): Promise<number> {
-  const row = await prisma.loginAttempt.findUnique({
+  const row = await prisma.rateLimit.findUnique({
     where: { scope_identity_ip: { scope, identity, ip } },
   });
   if (!row?.lockedUntil) return 0;
@@ -21,7 +21,7 @@ export async function lockMinutesRemaining(scope: string, identity: string, ip: 
 
 /** Record one failed attempt, locking the identity out once the threshold is hit. */
 export async function recordFailure(scope: string, identity: string, ip: string): Promise<void> {
-  const existing = await prisma.loginAttempt.findUnique({
+  const existing = await prisma.rateLimit.findUnique({
     where: { scope_identity_ip: { scope, identity, ip } },
   });
   const attempts = (existing?.attempts ?? 0) + 1;
@@ -30,7 +30,7 @@ export async function recordFailure(scope: string, identity: string, ip: string)
       ? new Date(Date.now() + env.login.lockoutMinutes * 60_000)
       : null;
 
-  await prisma.loginAttempt.upsert({
+  await prisma.rateLimit.upsert({
     where: { scope_identity_ip: { scope, identity, ip } },
     create: { scope, identity, ip, attempts, lockedUntil },
     update: { attempts, lockedUntil },
@@ -39,5 +39,5 @@ export async function recordFailure(scope: string, identity: string, ip: string)
 
 /** A successful sign-in clears the identity's record entirely. */
 export async function clearFailures(scope: string, identity: string, ip: string): Promise<void> {
-  await prisma.loginAttempt.deleteMany({ where: { scope, identity, ip } });
+  await prisma.rateLimit.deleteMany({ where: { scope, identity, ip } });
 }

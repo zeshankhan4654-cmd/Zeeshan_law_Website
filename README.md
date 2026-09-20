@@ -192,6 +192,61 @@ real accounts — the Principal saw the full sidebar, and a Colleague account
 saw Money and Website sections disappear entirely and Office reduced to just
 Enquiries, matching `role_caps` exactly.
 
+## The public site
+
+Home, practice areas, the chamber, the library, writing, contact and a
+client-portal page, all Server Components. A marketing site has no reason
+to ship a data-fetching library to a visitor: only the enquiry form and the
+narrow-screen menu are client components. Rendered pages revalidate every
+five minutes, so a review or an article the office adds appears without a
+redeploy.
+
+**Everything renders with JavaScript switched off**, which is verified
+rather than assumed. Two earlier attempts at the section animation failed
+that test in instructive ways, and the comments in
+`components/site/Reveal.tsx` record both:
+
+- Framer Motion's `initial` is inlined during server rendering, so the
+  page's own content was delivered at `opacity: 0` and stayed invisible
+  until JavaScript hydrated — a blank practice-areas section for a crawler
+  or a blocked script.
+- A CSS scroll-driven timeline fixed that and broke the other end: an
+  element already on screen at load never completes its `entry` range,
+  because the page cannot be scrolled up any further, so the hero sat
+  permanently half-faded.
+
+What ships is a CSS load-time fade with no scroll position and no script to
+wait on, skipped entirely for anyone who has asked for less motion.
+
+### Contact details are absent, not invented
+
+`SITE_DEFAULTS` in `backend/src/lib/site-settings.ts` ships the firm's name,
+tagline, address and hours. Every telephone number, email address, WhatsApp
+number and social account is **deliberately empty**, and each element that
+depends on one renders only once it is set.
+
+A wrong telephone number on a law firm's website is worse than no telephone
+number: it sends someone in difficulty to a stranger. The same reasoning
+applies to reviews — none are seeded, because a fabricated client review is
+not a placeholder, it is a lie about a real firm. Both are filled in from
+Site Settings in Phase 6.
+
+### The enquiry form
+
+The only place an unauthenticated stranger writes to the database, so it
+has three guards, none of which asks a person in difficulty to prove they
+are human:
+
+- a **honeypot** field hidden from people, answered exactly like a real
+  submission so a script learns nothing from the response;
+- Joi on the shape and length, including "leave a telephone number *or* an
+  email address" — written as a value check rather than `.or()`, because
+  Joi applies defaults first and both keys are then always present;
+- **five an hour per address**, counted in the same `rate_limits` table the
+  sign-in throttle uses. Rate limits are keyed on `req.ip`, so
+  `TRUST_PROXY_HOPS` must match the deployment exactly — trusting
+  `X-Forwarded-For` blindly would let a caller choose their own address.
+
 ## Conventions
 
 - **TypeScript everywhere**, `strict: true`. No `any` without a comment
@@ -219,7 +274,7 @@ Enquiries, matching `role_caps` exactly.
 - [x] **Phase 2** — design system, shared UI primitives, office login &
       protected shell (client shell deferred to Phase 4, once client-portal
       auth exists to build it against)
-- [ ] Phase 3 — public marketing site
+- [x] **Phase 3** — public marketing site
 - [ ] Phase 4 — client portal + login flows
 - [ ] Phase 5 — office core (cases, clients, money, diary)
 - [ ] Phase 6 — office content tools (blog, reviews, settings, roles)

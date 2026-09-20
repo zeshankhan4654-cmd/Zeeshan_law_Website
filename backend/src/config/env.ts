@@ -36,6 +36,13 @@ const schema = Joi.object({
   // nothing, which is what a development machine wants.
   PUSH_TRANSPORT: Joi.string().valid("expo", "log", "off").default("expo"),
 
+  // How many reverse proxies sit in front of this server. Behind nginx or a
+  // hosting panel, req.ip is the proxy's address unless this is set, which
+  // would make every rate limit global. It is opt-in and a count rather
+  // than a boolean, because trusting X-Forwarded-For blindly lets a caller
+  // choose their own address and walk around the limit.
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
+
   // Failed sign-ins before an identity is locked out, and for how long.
   LOGIN_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
   LOGIN_LOCKOUT_MINUTES: Joi.number().integer().min(1).default(15),
@@ -62,6 +69,7 @@ export const env = {
   },
   uploadDir: value.UPLOAD_DIR as string,
   voiceNoteMaxBytes: (value.VOICE_NOTE_MAX_MB as number) * 1024 * 1024,
+  trustProxyHops: value.TRUST_PROXY_HOPS as number,
   push: {
     apiUrl: value.PUSH_API_URL as string,
     transport: value.PUSH_TRANSPORT as "expo" | "log" | "off",

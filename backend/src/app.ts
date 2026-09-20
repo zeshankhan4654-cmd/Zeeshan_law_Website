@@ -11,9 +11,15 @@ import { libraryRouter } from "./routes/library.route.js";
 import { officeRouter } from "./routes/office.route.js";
 import { portalCasesRouter } from "./routes/portal-cases.route.js";
 import { portalRouter } from "./routes/portal.route.js";
+import { siteRouter } from "./routes/site.route.js";
 
 export function createApp(): Express {
   const app = express();
+
+  // Only as many hops as the deployment actually has: every rate limit here
+  // is keyed on req.ip, and an unconfigured or over-generous setting lets a
+  // caller pick their own address.
+  app.set("trust proxy", env.trustProxyHops);
 
   // Security headers, including HSTS — real TLS termination happens at the
   // hosting platform, this just tells browsers to insist on it.
@@ -39,6 +45,7 @@ export function createApp(): Express {
   app.use("/api/office", officeRouter);
   app.use("/api/portal", portalRouter);
   app.use("/api/portal", portalCasesRouter);
+  app.use("/api/site", siteRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

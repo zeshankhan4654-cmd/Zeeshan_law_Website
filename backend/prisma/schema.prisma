@@ -75,9 +75,13 @@ model PushToken {
   @@map("push_tokens")
 }
 
-/// Failed sign-in tracking, keyed by (scope, identity, ip) so a client login
-/// and an office login for the same name are throttled independently.
-model LoginAttempt {
+/// A counter of attempts, keyed by (scope, identity, ip).
+///
+/// Two things use it: sign-in throttling — where a client login and an office
+/// login for the same name are counted independently — and the public
+/// enquiry form, the one unauthenticated write on the site. The shape suits
+/// both, so they share a table rather than a near-duplicate one.
+model RateLimit {
   id          Int       @id @default(autoincrement())
   scope       String
   identity    String
@@ -87,7 +91,7 @@ model LoginAttempt {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@unique([scope, identity, ip])
-  @@map("login_attempts")
+  @@map("rate_limits")
 }
 
 // ---------------------------------------------------------------------------
