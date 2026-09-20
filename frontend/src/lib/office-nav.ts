@@ -1,22 +1,4 @@
-import {
-  BookOpen,
-  Calendar,
-  FileText,
-  Folder,
-  Gauge,
-  Inbox,
-  Landmark,
-  Layers,
-  MessagesSquare,
-  Newspaper,
-  PlayCircle,
-  Search,
-  Settings,
-  ShieldCheck,
-  Star,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { Calendar, Folder, Gauge, Inbox, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -32,7 +14,15 @@ export type NavSection = {
   items: NavItem[];
 };
 
-/** The office sidebar, grouped exactly as the original PHP build's was. */
+/**
+ * The office sidebar.
+ *
+ * Only screens that exist are listed. The original build's full menu also
+ * had the communications diary, official fees, office expenses, the library
+ * editors, the blog, reviews, settings and accounts; those return here as
+ * Phase 6 builds them. A sidebar item that leads nowhere is worse than one
+ * that is not there yet.
+ */
 export const OFFICE_NAV: NavSection[] = [
   {
     heading: null,
@@ -46,35 +36,11 @@ export const OFFICE_NAV: NavSection[] = [
     items: [
       { label: "Cases", href: "/office/cases", icon: Folder, cap: "cases.view" },
       { label: "Clients", href: "/office/clients", icon: Users, cap: "clients.view" },
-      { label: "Communications", href: "/office/communications", icon: MessagesSquare, cap: "comms.view" },
-      { label: "Professional Fees", href: "/office/fees", icon: Wallet, cap: "money.view" },
-      { label: "Official Fees", href: "/office/official-fees", icon: Landmark, cap: "money.view" },
-      { label: "Office Expenses", href: "/office/expenses", icon: Layers, cap: "money.view" },
-    ],
-  },
-  {
-    heading: "Library",
-    items: [
-      { label: "Judgments", href: "/office/library/judgments", icon: BookOpen, cap: "library.view" },
-      { label: "Legal Research", href: "/office/library/research", icon: Search, cap: "library.view" },
-      { label: "Videos & Lectures", href: "/office/library/media", icon: PlayCircle, cap: "library.view" },
-    ],
-  },
-  {
-    heading: "The website",
-    items: [
-      { label: "Blog", href: "/office/blog", icon: Newspaper, cap: "blog.edit" },
-      { label: "Client Reviews", href: "/office/testimonials", icon: Star, cap: "testimonials.edit" },
-      { label: "Site Settings", href: "/office/settings", icon: Settings, cap: "site.settings" },
     ],
   },
   {
     heading: "Office",
-    items: [
-      { label: "Enquiries", href: "/office/enquiries", icon: Inbox, cap: "enquiries.view" },
-      { label: "Accounts", href: "/office/users", icon: FileText, cap: "users.manage" },
-      { label: "Roles & Access", href: "/office/roles", icon: ShieldCheck, cap: "users.manage" },
-    ],
+    items: [{ label: "Enquiries", href: "/office/enquiries", icon: Inbox, cap: "enquiries.view" }],
   },
 ];
 
