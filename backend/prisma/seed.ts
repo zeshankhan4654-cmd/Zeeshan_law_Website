@@ -60,9 +60,27 @@ async function main() {
   const existingResearch = await prisma.research.count({ where: { firmId } });
   if (existingResearch === 0) {
     await prisma.research.createMany({
-      data: RESEARCH_ARTICLES.map((a) => ({ ...a, firmId, published: true })),
+      data: RESEARCH_ARTICLES.map((a) => ({
+        ...a,
+        firmId,
+        published: true,
+        // Also in the shared library, not merely on the chamber's own
+        // site. Without this a fresh install has an empty public library:
+        // the migration that approved already-published entries runs
+        // before this seed writes any, so these would sit at "private"
+        // for ever and nothing would appear on the Resources page.
+        //
+        // Safe to approve unreviewed only because these are the platform
+        // chamber's own articles, shipped with the product. Nothing any
+        // other chamber writes is ever approved without being read.
+        shareState: "approved",
+        sharedAt: new Date(),
+        shareNote: "Seeded with the platform.",
+      })),
     });
-    console.log(`Seeded ${RESEARCH_ARTICLES.length} legal research articles.`);
+    console.log(
+      `Seeded ${RESEARCH_ARTICLES.length} legal research articles into the shared library.`
+    );
   } else {
     console.log("The research library already has entries; skipped seeding.");
   }

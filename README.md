@@ -801,23 +801,44 @@ row counts, content intact.
 ### Deploying
 
 ```bash
-# 1. Bring the code across, then install only what is needed to run
-npm ci --omit=dev
+./scripts/deploy.sh
+```
 
-# 2. Build
+That is the whole of it. The script checks the configuration before it
+changes anything, backs the database up, installs, builds, migrates,
+seeds if the database is new, and then stops and tells you what to start
+— deliberately, because on a hosting panel starting processes is the
+panel's job and a script that fights it leaves two copies running.
+
+What it does, and the two things worth knowing about each:
+
+```bash
+npm ci                       # everything, including devDependencies
 npm run build:backend        # TypeScript -> backend/dist
 npm run build:frontend       # Next.js production build
-
-# 3. Apply migrations — deploy, never `migrate dev`, which can prompt
-cd backend && npx prisma migrate deploy && npx prisma generate
-
-# 4. Seed a first account, once, on an empty database
-npx prisma db seed           # admin / admin123 — change it immediately
-
-# 5. Start
-npm run start -w backend     # node dist/index.js
-npm run start -w frontend    # next start
+cd backend
+npx prisma migrate deploy    # deploy, never `migrate dev`, which can prompt
+npx prisma generate
+npx prisma db seed           # only does anything on an empty database
 ```
+
+**`npm ci`, not `npm ci --omit=dev`, and nothing is pruned afterwards.**
+Omitting devDependencies is the usual instinct and it is wrong here
+twice over. It removes `typescript` and `tailwindcss`, so neither build
+runs at all; and it removes `prisma` and `tsx`, which this deployment
+needs for the rest of its life — `prisma migrate deploy` on every future
+release, and `tsx` for every operational script, including the daily
+hearing-reminder cron and `platform:grant`, which is the only way anybody
+becomes a platform admin. A pruned install fails at the first build, and
+had it not, would have failed silently at half past four every afternoon.
+The cost of keeping them is disk; none of it is reachable from the
+running server.
+
+**`NEXT_PUBLIC_*` is baked in at build time, not read at run time.** The
+website's API address is compiled into the bundle, so `frontend/.env.production`
+has to be right *before* `npm run build:frontend`, not before `next start`.
+Getting this wrong produces a site that builds cleanly and then calls
+`localhost` from the visitor's browser.
 
 Both processes need a supervisor that restarts them — systemd, pm2, or the
 Node app manager in a hosting panel — and a reverse proxy terminating TLS
@@ -826,7 +847,61 @@ front of the API: rate limits are keyed on the caller's address, and
 trusting `X-Forwarded-For` blindly lets a caller choose their own.
 
 `UPLOAD_DIR` should point **outside** the repository, so a redeployment
-cannot delete the clients' documents.
+cannot delete the clients' documents. The deploy script refuses to run if
+it points inside, and refuses again if the directory does not exist.
+
+#### Once only, on a new deployment
+
+```bash
+cd backend
+npm run platform:grant -- you@example.com   # the only way to make one
+npm run platform:grant -- --list            # check
+```
+
+Then sign in as the seeded account and change its password. The API will
+not let it do anything else until you have — and its address is a
+`.invalid` placeholder, so change that too, from **My Account**.
+
+Add the daily reminder sweep to cron:
+
+```cron
+30 16 * * *  cd /path/to/backend && /usr/bin/npm run notify:hearings
+```
+
+#### The app links
+
+`frontend/public/.well-known/` holds the two files Android and iOS read
+before they will hand a client's link to the app instead of the browser.
+Both ship with placeholders and **neither works until you fill it in**:
+
+- `assetlinks.json` needs the SHA-256 fingerprint of the Android signing
+  key, from `eas credentials` after the first build.
+- `apple-app-site-association` needs the Apple Team ID, as
+  `TEAMID.com.lawyer360.app`.
+
+Apple refuses that second file unless it is served as `application/json`,
+and it has no extension, so Next guesses `application/octet-stream` and
+iOS ignores it without saying why. `next.config.ts` sets the header
+explicitly. Both files are served from the site root; check with
+`curl -I https://<site>/.well-known/apple-app-site-association` and look
+at the content type, not just the 200.
+
+Until they are filled in, a client's link opens the web portal instead of
+the app. Nothing breaks — they simply get the page.
+
+#### Checking the deployment from outside
+
+```bash
+curl https://<api>/api/health                    # {"status":"ok","database":"connected"}
+curl https://<site>/api/site/settings            # the chamber's own details
+curl -I https://<site>/.well-known/apple-app-site-association
+```
+
+The API refuses to start in production on a configuration copied from a
+development machine — a short or placeholder `JWT_SECRET`, a `localhost`
+or `http://` origin — and prints everything wrong at once rather than one
+thing at a time. If it will not start, read the message; it says what to
+fix.
 
 ### Dependencies
 
