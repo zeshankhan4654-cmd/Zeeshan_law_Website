@@ -31,5 +31,16 @@ export async function proposeUsername(
   }
 }
 
-export const portalUsernameTaken = async (candidate: string): Promise<boolean> =>
-  (await prisma.client.findUnique({ where: { portalUsername: candidate } })) !== null;
+/**
+ * Within one chamber, not across the platform.
+ *
+ * Two advocates may each act for a Fazal ur Rehman, and neither should be
+ * told the name is taken by somebody in a chamber they cannot see.
+ */
+export const portalUsernameTaken =
+  (firmId: number) =>
+  async (candidate: string): Promise<boolean> =>
+    (await prisma.client.findUnique({
+      where: { firmId_portalUsername: { firmId, portalUsername: candidate } },
+      select: { id: true },
+    })) !== null;

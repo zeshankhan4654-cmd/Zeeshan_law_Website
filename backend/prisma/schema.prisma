@@ -26,16 +26,29 @@ datasource db {
 /// one firm is reachable from another. The platform's own chamber is simply
 /// the first row.
 model Firm {
-  id              Int      @id @default(autoincrement())
+  id              Int    @id @default(autoincrement())
   /// Used in URLs and invitations, e.g. "arbitrator-law".
-  slug            String   @unique
+  slug            String @unique
   name            String
   /// "active" | "suspended" — a suspended chamber cannot sign in at all.
-  status          String   @default("active")
+  status          String @default("active")
   /// Set when the platform admin suspends it, for the message shown.
-  suspendedReason String   @default("") @map("suspended_reason")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  suspendedReason String @default("") @map("suspended_reason")
+
+  /// Whether the platform has checked that this really is an advocate.
+  ///
+  /// Anybody can type "advocate" into a sign-up form, so every chamber
+  /// starts unverified. This deliberately does NOT restrict a chamber's own
+  /// private use — that use is the product, and gating it on a manual check
+  /// would mean nobody could start work on the day they signed up. It gates
+  /// what becomes *public* in the chamber's name, and gives the platform
+  /// admin something to act on.
+  verified    Boolean  @default(false)
+  /// Free text: an enrolment or bar council number as the advocate gave it.
+  /// Stored as given and never treated as proof of anything by itself.
+  enrolmentNo String   @default("") @map("enrolment_no")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   users          User[]
   roles          Role[]
@@ -70,20 +83,31 @@ model Firm {
 /// capability regardless of what role_caps says — enforced in application
 /// code, not here, so a future capability is automatically covered.
 model User {
-  id                 Int      @id @default(autoincrement())
-  username           String   @unique
+  id Int @id @default(autoincrement())
+
+  /// How this person signs in. Unique across the whole platform, because an
+  /// address is already one person's and needs no chamber named beside it.
+  /// An address ending `.invalid` is a placeholder written by the migration
+  /// for an account that pre-dates email sign-in; it works, but the holder
+  /// should replace it.
+  email String @unique
+
+  /// The handle inside the chamber — what signs a case update. Two chambers
+  /// may each have a `naveed.ahmad`, which is the whole point of M2: the
+  /// second advocate to join must not be told a name is taken because
+  /// somebody in a chamber they cannot see is using it.
+  username String
+
   passwordHash       String   @map("password_hash")
   fullName           String   @map("full_name")
   role               String
   mustChangePassword Boolean  @default(false) @map("must_change_password")
   createdAt          DateTime @default(now()) @map("created_at")
 
-  // `username` stays unique across the whole platform for now, so signing
-  // in needs no firm chosen first. M2 moves sign-in to an email address and
-  // frees the handle to be per-chamber.
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
+  @@unique([firmId, username])
   @@index([firmId])
   @@map("users")
 }
@@ -177,7 +201,11 @@ model Client {
   email                    String   @default("")
   address                  String   @default("")
   portalEnabled            Boolean  @default(false) @map("portal_enabled")
-  portalUsername           String?  @unique @map("portal_username")
+  /// Unique within the chamber, not the platform. A client may have no
+  /// email at all — an elderly litigant very often does not — so they keep
+  /// a username, and the chamber comes from the link their advocate sent
+  /// them rather than from anything they have to remember.
+  portalUsername           String?  @map("portal_username")
   portalHash               String?  @map("portal_hash")
   /// Set when the office issues or resets a portal password; the portal
   /// refuses every other route until the client has chosen their own.
@@ -193,6 +221,7 @@ model Client {
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
+  @@unique([firmId, portalUsername])
   @@index([firmId])
   @@map("clients")
 }

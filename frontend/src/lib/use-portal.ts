@@ -11,10 +11,14 @@ import type { PortalClient } from "./portal-session";
  */
 export function usePortalLogin() {
   return useMutation({
-    mutationFn: (credentials: { username: string; password: string }) =>
+    mutationFn: (credentials: { firm: string; username: string; password: string }) =>
       apiFetch<PortalClient & { token: string }>("/api/portal/login", {
         method: "POST",
         body: JSON.stringify({
+          // The chamber comes from the link the advocate sent, which is
+          // what lets a client's username be unique within a chamber
+          // rather than across every chamber on the platform.
+          firm: credentials.firm.trim().toLowerCase(),
           username: credentials.username.trim().toLowerCase(),
           password: credentials.password,
         }),

@@ -174,7 +174,7 @@ officeRecordsRouter.post(
   requireCap("clients.portal"),
   validate(portalAccessSchema),
   asyncHandler(async (req, res) => {
-    const { db } = tenant(req);
+    const { db, firmId } = tenant(req);
     const id = parseId(req.params.id);
     const { enabled, showFees, resetPassword } = req.body as PortalAccessInput;
 
@@ -192,7 +192,7 @@ officeRecordsRouter.post(
 
     const needsPassword = resetPassword || !client.portalHash;
     const username =
-      client.portalUsername ?? (await proposeUsername(client.name, portalUsernameTaken));
+      client.portalUsername ?? (await proposeUsername(client.name, portalUsernameTaken(firmId)));
     const password = needsPassword ? generatePassword() : null;
 
     await db.client.update({

@@ -1,36 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
+import { seedChamberRoles } from "../src/lib/default-roles.js";
+import { forFirm } from "../src/lib/tenant.js";
 import { RESEARCH_ARTICLES } from "./seed-data/research.js";
 
 const prisma = new PrismaClient();
-
-const DEFAULT_ROLES = [
-  { roleKey: "admin", label: "Principal", description: "Everything, including accounts and deleting records", isSystem: true, sortOrder: 10 },
-  { roleKey: "editor", label: "Clerk", description: "Day-to-day work, the diaries, the money, and the website", isSystem: true, sortOrder: 20 },
-  { roleKey: "associate", label: "Colleague", description: "Case work only, with no money and no accounts", isSystem: true, sortOrder: 30 },
-];
-
-const EDITOR_CAPS = [
-  "cases.view", "cases.edit",
-  "clients.view", "clients.edit", "clients.portal",
-  "hearings.edit", "updates.edit",
-  "documents.edit", "messages.reply",
-  "money.view", "money.edit",
-  "comms.view", "comms.edit",
-  "library.view", "library.edit", "library.publish",
-  "enquiries.view",
-  "blog.edit", "testimonials.edit",
-];
-
-const ASSOCIATE_CAPS = [
-  "cases.view", "cases.edit",
-  "clients.view", "clients.edit",
-  "hearings.edit", "updates.edit",
-  "documents.edit", "messages.reply",
-  "comms.view", "comms.edit",
-  "library.view", "library.edit",
-  "enquiries.view",
-];
 
 /**
  * Everything seeded belongs to one chamber — the one this deployment's
@@ -49,42 +23,34 @@ async function main() {
   const firmId = firm.id;
   console.log(`Seeding chamber "${firm.name}" (${FIRM_SLUG}).`);
 
-  for (const role of DEFAULT_ROLES) {
-    await prisma.role.upsert({
-      where: { firmId_roleKey: { firmId, roleKey: role.roleKey } },
-      create: { ...role, firmId },
-      update: role,
-    });
-  }
-
-  const grants = [
-    ...EDITOR_CAPS.map((cap) => ({ roleKey: "editor", cap })),
-    ...ASSOCIATE_CAPS.map((cap) => ({ roleKey: "associate", cap })),
-  ];
-  for (const grant of grants) {
-    await prisma.roleCap.upsert({
-      where: { firmId_roleKey_cap: { firmId, ...grant } },
-      create: { ...grant, firmId },
-      update: {},
-    });
-  }
+  // The same starting roles a chamber gets when an advocate signs one up,
+  // from the same place, so the first chamber and the thousandth match.
+  await seedChamberRoles(forFirm(firmId), firmId);
 
   // A way in on a fresh database. The app refuses to let this account touch
   // anything else until its password has been changed — see
   // requireNoPendingPasswordChange. Change it immediately once you are in.
   const existingAdmin = await prisma.user.count({ where: { firmId, role: "admin" } });
   if (existingAdmin === 0) {
+    // `.invalid` is reserved by RFC 2606, so this placeholder can never be
+    // a real address and can never collide with one. It signs in, and the
+    // office tells its holder to replace it.
+    const email = `admin@${FIRM_SLUG}.invalid`;
     await prisma.user.create({
       data: {
         firmId,
         username: "admin",
+        email,
         passwordHash: await hashPassword("admin123"),
         fullName: "Principal",
         role: "admin",
         mustChangePassword: true,
       },
     });
-    console.log('Seeded a first account: username "admin", password "admin123" — change it on first sign-in.');
+    console.log(
+      `Seeded a first account: sign in with "${email}", password "admin123" — ` +
+        "change both on first sign-in."
+    );
   } else {
     console.log("An admin account already exists; skipped seeding one.");
   }

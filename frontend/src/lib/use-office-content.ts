@@ -88,9 +88,14 @@ export function useUploadCover(postId: number) {
 
 export function useCreateUser() {
   return useRefreshing<
-    { fullName: string; username: string; role: string },
-    { id: number; username: string; password: string }
-  >((fields) => apiFetch("/api/office/users", { method: "POST", body: JSON.stringify(fields) }));
+    { fullName: string; username: string; email: string; role: string },
+    { id: number; username: string; email: string; password: string }
+  >((fields) =>
+    apiFetch("/api/office/users", {
+      method: "POST",
+      body: JSON.stringify({ ...fields, email: fields.email.trim().toLowerCase() }),
+    })
+  );
 }
 
 export function useEditUser(id: number) {

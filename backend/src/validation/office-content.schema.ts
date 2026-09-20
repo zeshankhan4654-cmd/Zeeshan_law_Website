@@ -60,6 +60,14 @@ export const userSchema = Joi.object({
     .pattern(/^[a-z0-9._-]+$/)
     .required()
     .messages({ "string.pattern.base": "A username may hold only letters, numbers, dots, hyphens and underscores." }),
+  // What they sign in with. Unique across the platform, unlike the handle
+  // above, which only has to be free inside this chamber.
+  email: Joi.string()
+    .trim()
+    .lowercase()
+    .email({ minDomainSegments: 2, tlds: false })
+    .max(160)
+    .required(),
   role: Joi.string().trim().min(2).max(40).required(),
 });
 

@@ -24,13 +24,27 @@ export function OfficeShell({ user, children }: { user: SessionUser; children: R
 
   return (
     <div className="min-h-screen bg-ground">
+      {user.emailIsPlaceholder && (
+        <p className="fixed inset-x-0 top-0 z-20 bg-gold-wash px-4 py-2 text-center text-xs text-ink">
+          You sign in with <span className="font-semibold">{user.email}</span>, which was
+          written for you and cannot receive mail.{" "}
+          <Link href="/office/account" className="font-semibold text-gold underline">
+            Put your real address in
+          </Link>
+          .
+        </p>
+      )}
+
       <aside className="fixed inset-y-0 left-0 flex w-62 flex-col overflow-y-auto bg-ink text-white/75">
         <Link href="/office" className="flex items-center gap-2 border-b border-white/10 px-4 py-4">
           <span className="grid size-8 place-items-center rounded-md bg-gold/15 ring-1 ring-gold/40">
             <Scale className="size-4 text-gold-bright" strokeWidth={1.5} />
           </span>
+          {/* The chamber's own name. Every advocate has their own office
+              here, and seeing somebody else's name over it would be both
+              wrong and alarming. */}
           <span className="text-sm leading-tight font-semibold text-white">
-            The Arbitrator &amp; Law Associates
+            {user.chamber?.name ?? "Office"}
             <span className="block text-[0.68rem] font-normal text-gold-bright">Office Diary</span>
           </span>
         </Link>

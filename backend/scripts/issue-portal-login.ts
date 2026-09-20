@@ -25,18 +25,21 @@ function generatePassword(): string {
 }
 
 /**
- * "Fazal ur Rehman" -> "fazal.rehman", made unique if it is already taken.
+ * "Fazal ur Rehman" -> "fazal.rehman", made unique within this chamber.
  *
- * Checked across the whole platform, not this chamber: a portal username
- * is still how a client signs in, so two chambers cannot both hold one.
+ * Within, not across: two advocates may each act for a Fazal ur Rehman, and
+ * the chamber is supplied by the link the client is sent.
  */
-async function proposeUsername(name: string): Promise<string> {
+async function proposeUsername(firmId: number, name: string): Promise<string> {
   const parts = name.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
   const base = (parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : parts[0]) || "client";
 
   for (let n = 0; ; n += 1) {
     const candidate = n === 0 ? base : `${base}${n + 1}`;
-    const taken = await prisma.client.findUnique({ where: { portalUsername: candidate } });
+    const taken = await prisma.client.findUnique({
+      where: { firmId_portalUsername: { firmId, portalUsername: candidate } },
+      select: { id: true },
+    });
     if (!taken) return candidate;
   }
 }
@@ -56,7 +59,7 @@ async function main() {
   const client =
     existing ?? (await db.client.create({ data: { firmId: chamber.id, name } }));
 
-  const username = client.portalUsername ?? (await proposeUsername(name));
+  const username = client.portalUsername ?? (await proposeUsername(chamber.id, name));
   const password = generatePassword();
 
   await db.client.update({
@@ -73,7 +76,10 @@ async function main() {
   console.log(`  ${existing ? "Portal access reset for" : "Client created:"} ${client.name}`);
   console.log(`  username  ${username}`);
   console.log(`  password  ${password}`);
-  console.log("\n  Give these to the client directly. The password is not stored and");
+  console.log(`  sign-in    /client/login/${chamber.slug}`);
+  console.log("\n  Give these to the client directly, along with that link — the");
+  console.log("  chamber is part of signing in, so the username alone is not enough.");
+  console.log("  The password is not stored and");
   console.log("  cannot be shown again; the app makes them choose their own on first");
   console.log("  sign-in. Run this again to issue a fresh one.\n");
 }

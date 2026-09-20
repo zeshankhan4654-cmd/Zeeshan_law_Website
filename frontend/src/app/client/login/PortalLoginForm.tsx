@@ -7,7 +7,7 @@ import { Field } from "@/components/ui/Field";
 import { ApiError } from "@/lib/api";
 import { usePortalLogin } from "@/lib/use-portal";
 
-export function PortalLoginForm() {
+export function PortalLoginForm({ chamber }: { chamber: string }) {
   const router = useRouter();
   const login = usePortalLogin();
   const [username, setUsername] = useState("");
@@ -18,7 +18,7 @@ export function PortalLoginForm() {
     e.preventDefault();
     setError("");
     login.mutate(
-      { username, password },
+      { firm: chamber, username, password },
       {
         onSuccess: (client) => {
           // A password the office chose is not a password its holder chose.

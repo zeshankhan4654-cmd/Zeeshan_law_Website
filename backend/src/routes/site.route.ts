@@ -3,6 +3,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
 import { contentTypeFor, resolveStoredPath } from "../lib/uploads.js";
 import { platformDb, platformFirmId } from "../lib/platform.js";
+import { prisma } from "../lib/prisma.js";
 import { countAction, secondsUntilAllowed } from "../lib/rate-limit.js";
 import { publicSettings } from "../lib/site-settings.js";
 import { ApiError } from "../middleware/errorHandler.js";
@@ -36,6 +37,30 @@ siteRouter.get(
   "/settings",
   asyncHandler(async (_req, res) => {
     res.json(await publicSettings(await platformFirmId()));
+  })
+);
+
+/**
+ * A chamber's public name, for the sign-in page its clients are sent to.
+ *
+ * The slug is already in the link the advocate handed out, so this reveals
+ * nothing that was secret; what it adds is the chamber's name on the page,
+ * which is what tells a client they are in the right place rather than on
+ * somebody's imitation of it. Nothing else about the chamber is returned,
+ * and a suspended one is not found at all.
+ */
+siteRouter.get(
+  "/chambers/:slug",
+  asyncHandler(async (req, res) => {
+    const slug = String(req.params.slug ?? "").slice(0, 64).toLowerCase();
+
+    const firm = await prisma.firm.findFirst({
+      where: { slug, status: "active" },
+      select: { slug: true, name: true },
+    });
+    if (!firm) throw new ApiError(404, "No such chamber.");
+
+    res.json(firm);
   })
 );
 

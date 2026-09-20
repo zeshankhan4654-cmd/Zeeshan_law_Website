@@ -332,7 +332,7 @@ officeContentRouter.get(
       db.user.findMany({
         orderBy: { fullName: "asc" },
         select: {
-          id: true, username: true, fullName: true, role: true,
+          id: true, username: true, email: true, fullName: true, role: true,
           mustChangePassword: true, createdAt: true,
         },
       }),
@@ -348,33 +348,42 @@ officeContentRouter.post(
   validate(userSchema),
   asyncHandler(async (req, res) => {
     const { db, firmId } = tenant(req);
-    const { fullName, username, role } = req.body as {
+    const { fullName, username, email, role } = req.body as {
       fullName: string;
       username: string;
+      email: string;
       role: string;
     };
 
     const roleExists = await db.role.findFirst({ where: { roleKey: role } });
     if (!roleExists) throw new ApiError(400, "That role does not exist.");
 
-    // Deliberately unscoped: a username is still how everyone signs in, so
-    // it has to be unique across the platform, not merely within a chamber.
-    // Checking it here gives an honest message instead of a constraint
-    // violation. M2 moves sign-in to email and this becomes per-chamber.
-    const taken = await prisma.user.findUnique({ where: { username }, select: { id: true } });
-    if (taken) throw new ApiError(400, "That username is already in use.");
+    // The handle is unique within the chamber only. Another chamber's
+    // naveed.ahmad is none of this chamber's business, and saying a free
+    // name was taken would tell the asker that somebody they cannot see
+    // exists.
+    const handleTaken = await db.user.findFirst({ where: { username }, select: { id: true } });
+    if (handleTaken) throw new ApiError(400, "Somebody here already uses that username.");
+
+    // The address, by contrast, is how sign-in finds the account at all, so
+    // it is checked across the platform. The message names no chamber.
+    const addressTaken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (addressTaken) {
+      throw new ApiError(400, "An account already signs in with that email address.");
+    }
 
     const password = generatePassword();
     const created = await db.user.create({
       data: {
         firmId,
         username,
+        email,
         fullName,
         role,
         passwordHash: await hashPassword(password),
         mustChangePassword: true,
       },
-      select: { id: true, username: true },
+      select: { id: true, username: true, email: true },
     });
 
     // Shown once, as with a client's.
@@ -463,7 +472,7 @@ officeContentRouter.get(
     const username = await proposeUsername(
       name,
       async (candidate) =>
-        (await db.user.findUnique({ where: { username: candidate }, select: { id: true } })) !== null,
+        (await db.user.findFirst({ where: { username: candidate }, select: { id: true } })) !== null,
       "staff"
     );
     res.json({ username });

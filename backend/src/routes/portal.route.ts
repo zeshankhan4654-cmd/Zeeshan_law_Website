@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { clientSession, requireClient, tenant } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
-import { changePasswordSchema, loginSchema } from "../validation/auth.schema.js";
+import { changePasswordSchema, portalLoginSchema } from "../validation/auth.schema.js";
 
 /**
  * The client portal's own sign-in, separate from the office's.
@@ -24,34 +24,52 @@ const LOGIN_SCOPE = "client";
 
 portalRouter.post(
   "/login",
-  validate(loginSchema),
+  validate(portalLoginSchema),
   asyncHandler(async (req, res) => {
-    const { username, password } = req.body as { username: string; password: string };
+    const { firm: slug, username, password } = req.body as {
+      firm: string;
+      username: string;
+      password: string;
+    };
     const ip = req.ip ?? "unknown";
 
-    const wait = await lockMinutesRemaining(LOGIN_SCOPE, username, ip);
+    // Throttled per chamber as well as per name, so a client of one
+    // advocate cannot be locked out by somebody guessing at the same
+    // common username in another chamber.
+    const identity = `${slug}/${username}`;
+
+    const wait = await lockMinutesRemaining(LOGIN_SCOPE, identity, ip);
     if (wait > 0) {
       throw new ApiError(429, `Too many attempts. Try again in ${wait} minute${wait === 1 ? "" : "s"}.`);
     }
 
-    // Unscoped by necessity, as with the office sign-in: this is how we
-    // learn which chamber the client belongs to.
-    const client = await prisma.client.findUnique({
-      where: { portalUsername: username },
-      include: { firm: { select: { status: true, suspendedReason: true } } },
+    // The chamber comes from the link the advocate sent, which is what lets
+    // a username be unique within a chamber rather than across the
+    // platform. An unknown chamber is answered exactly like a wrong
+    // password: the form must not become a way to enumerate who is here.
+    const firm = await prisma.firm.findUnique({
+      where: { slug },
+      select: { id: true, status: true },
     });
+
+    const client = firm
+      ? await prisma.client.findUnique({
+          where: { firmId_portalUsername: { firmId: firm.id, portalUsername: username } },
+        })
+      : null;
+
     const valid =
       client?.portalHash ? await verifyPassword(password, client.portalHash) : false;
 
-    if (!client || !valid) {
-      await recordFailure(LOGIN_SCOPE, username, ip);
+    if (!firm || !client || !valid) {
+      await recordFailure(LOGIN_SCOPE, identity, ip);
       throw new ApiError(401, "Wrong username or password.");
     }
 
     // Only reachable by someone who already proved they hold the password, so
     // saying plainly that access is switched off reveals nothing and saves a
     // phone call.
-    if (client.firm.status !== "active") {
+    if (firm.status !== "active") {
       throw new ApiError(
         403,
         "Your advocate's chamber is not currently active. Please contact them directly."
@@ -62,7 +80,7 @@ portalRouter.post(
       throw new ApiError(403, "Your portal access is switched off. Please contact the office.");
     }
 
-    await clearFailures(LOGIN_SCOPE, username, ip);
+    await clearFailures(LOGIN_SCOPE, identity, ip);
 
     const token = signSession({ kind: "client", sub: client.id, username, firm: client.firmId });
 

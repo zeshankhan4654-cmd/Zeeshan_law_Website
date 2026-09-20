@@ -127,3 +127,21 @@ export function whatsappHref(settings: SiteSettings): string | null {
   const message = settings["contact.whatsappMessage"]?.trim();
   return `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
 }
+
+export type PublicChamber = { slug: string; name: string };
+
+/**
+ * A chamber by the slug in its client sign-in link, or null if there is no
+ * active chamber by that name.
+ *
+ * The page it brands is the one an advocate sends their clients to, so
+ * getting the name onto it matters: a sign-in page carrying nobody's name
+ * is exactly what a phishing copy of it would also look like.
+ */
+export async function getChamber(slug: string): Promise<PublicChamber | null> {
+  try {
+    return await apiFetch<PublicChamber>(`/api/site/chambers/${encodeURIComponent(slug)}`);
+  } catch {
+    return null;
+  }
+}

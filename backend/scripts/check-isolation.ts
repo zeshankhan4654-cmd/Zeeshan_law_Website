@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { hashPassword, verifyPassword } from "../src/lib/password.js";
 import { prisma } from "../src/lib/prisma.js";
 import { forFirm, scopedModelNames } from "../src/lib/tenant.js";
 
@@ -90,7 +91,28 @@ async function makeChamber(slug: string, name: string) {
     data: { firmId: firm.id, slug: "a-note", title: `${name} writes` },
   });
 
-  return { firm, db, client, matter, message, document, fee, setting, post };
+  // Deliberately the same handle and the same client username in both
+  // chambers. Before M2 the second of these could not exist at all.
+  const staff = await db.user.create({
+    data: {
+      firmId: firm.id,
+      username: "naveed.ahmad",
+      email: `naveed@${slug}.invalid`,
+      fullName: "Naveed Ahmad",
+      role: "admin",
+      passwordHash: await hashPassword(`password-for-${slug}`),
+    },
+  });
+  await db.client.update({
+    where: { id: client.id },
+    data: {
+      portalEnabled: true,
+      portalUsername: "fazal.rehman",
+      portalHash: await hashPassword(`portal-for-${slug}`),
+    },
+  });
+
+  return { firm, db, client, matter, message, document, fee, setting, post, staff };
 }
 
 /** One message in a chamber, whatever an earlier probe did to the last one. */
@@ -266,6 +288,83 @@ async function probe(attacker: Chamber, victim: Chamber): Promise<void> {
   );
 }
 
+/**
+ * The names two chambers may now share, and the one thing that still tells
+ * them apart at sign-in.
+ */
+async function probeIdentities(a: Chamber, b: Chamber): Promise<void> {
+  console.log("\n  Sign-in identities:");
+
+  // Both chambers hold a naveed.ahmad and a fazal.rehman. The rows exist,
+  // which is itself the M2 property — under the old global unique index
+  // creating the second chamber would have failed outright.
+  expectEqual("both chambers hold a staff handle of the same name", a.staff.username, b.staff.username);
+
+  const handles = await prisma.user.findMany({ where: { username: "naveed.ahmad" } });
+  expectEqual("and both rows exist", handles.length >= 2, true);
+
+  // The address is what is unique, and it is what sign-in looks up.
+  await expectRefused("two accounts cannot share an email address", () =>
+    prisma.user.create({
+      data: {
+        firmId: b.firm.id,
+        username: "someone.else",
+        email: a.staff.email,
+        fullName: "Someone Else",
+        role: "admin",
+        passwordHash: "x",
+      },
+    })
+  );
+
+  // A handle free in one chamber is not free in its own, twice over.
+  await expectRefused("a chamber cannot reuse its own handle", () =>
+    a.db.user.create({
+      data: {
+        firmId: a.firm.id,
+        username: a.staff.username,
+        email: `another@${a.firm.slug}.invalid`,
+        fullName: "Another",
+        role: "admin",
+        passwordHash: "x",
+      },
+    })
+  );
+
+  // Signing in by address lands in the right chamber, and only that one.
+  for (const chamber of [a, b]) {
+    const found = await prisma.user.findUnique({ where: { email: chamber.staff.email } });
+    expectEqual(
+      `${chamber.firm.name}'s address resolves to its own chamber`,
+      found?.firmId,
+      chamber.firm.id
+    );
+  }
+
+  // The client username is shared, so the chamber in the link is the only
+  // thing that decides whose client signs in — and the other chamber's
+  // password must not work against it.
+  for (const [chamber, other] of [[a, b], [b, a]] as const) {
+    const client = await prisma.client.findUnique({
+      where: { firmId_portalUsername: { firmId: chamber.firm.id, portalUsername: "fazal.rehman" } },
+    });
+    expectEqual(
+      `fazal.rehman in ${chamber.firm.name} is ${chamber.firm.name}'s client`,
+      client?.id,
+      chamber.client.id
+    );
+
+    const wrong = client?.portalHash
+      ? await verifyPassword(`portal-for-${other.firm.slug}`, client.portalHash)
+      : true;
+    if (wrong) {
+      fail(`the other chamber's password does not open ${chamber.firm.name}'s client`, "it did");
+    } else {
+      ok(`the other chamber's password does not open ${chamber.firm.name}'s client`);
+    }
+  }
+}
+
 /** Every model that holds chamber work must be scoped; this says which are not. */
 function reportCoverage(): void {
   console.log("\n  Schema coverage:");
@@ -302,6 +401,7 @@ async function main(): Promise<void> {
     // first chamber correctly and the second not at all.
     await probe(a, b);
     await probe(b, a);
+    await probeIdentities(a, b);
     reportCoverage();
   } finally {
     await prisma.firm.deleteMany({ where: { id: { in: [a.firm.id, b.firm.id] } } });

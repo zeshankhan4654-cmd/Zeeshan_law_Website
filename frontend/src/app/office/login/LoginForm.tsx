@@ -1,6 +1,7 @@
 "use client";
 
 import { Scale } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
@@ -12,7 +13,7 @@ import { useLogin } from "@/lib/use-auth";
 export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -20,7 +21,7 @@ export function LoginForm() {
     e.preventDefault();
     setError("");
     login.mutate(
-      { username, password },
+      { email, password },
       {
         onSuccess: (user) => {
           router.push(user.mustChangePassword ? "/office/change-password" : "/office");
@@ -46,10 +47,12 @@ export function LoginForm() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
           <Field
-            label="Username"
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            label="Email"
+            type="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
           <Field
@@ -70,9 +73,16 @@ export function LoginForm() {
           </Button>
         </form>
 
-        <p className="text-center text-xs text-ink-soft">
-          Usernames are all small letters. Clients sign in at the client portal instead.
-        </p>
+        <div className="flex flex-col gap-2 text-center text-xs text-ink-soft">
+          <p>Clients sign in through the link their advocate sent them, not here.</p>
+          <p>
+            No chamber yet?{" "}
+            <Link href="/signup" className="font-semibold text-gold hover:underline">
+              Register yours
+            </Link>
+            .
+          </p>
+        </div>
       </CardBody>
     </Card>
   );

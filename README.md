@@ -142,7 +142,13 @@ directions, because a one-way test passes on a bug that scopes the first
 chamber correctly and the second not at all. It also fails if a model exists
 with neither a `firmId` nor a stated reason.
 
-51 checks. They all have to pass, and it cleans up after itself, so it is
+It then checks what M2 added: that both chambers really do hold a
+`naveed.ahmad` and a `fazal.rehman`, that two accounts still cannot share an
+email address, that a chamber cannot reuse its own handle, that each
+address resolves to its own chamber, and that one chamber's portal password
+does not open the other chamber's identically-named client.
+
+61 checks. They all have to pass, and it cleans up after itself, so it is
 safe against a development database.
 
 ### The public pages
@@ -160,14 +166,72 @@ every chamber may contribute and the platform admin moderates what appears,
 is a later milestone; until that moderation exists, another chamber
 publishing an entry must not put it on this website unreviewed.
 
-### What is still global
+### Registering a chamber
 
-`users.username` and `clients.portal_username` remain unique across the
-platform, not per chamber, because they are still how everyone signs in.
-Sign-in therefore runs on the unscoped client — it is how we learn which
-chamber somebody belongs to — and refuses a chamber that is not active,
-after the password has been verified. Moving sign-in to email, so usernames
-can be per-chamber, is the next milestone.
+`POST /api/signup`, and the page at `/signup`, is the one place on the
+platform where a stranger creates an account — deliberately, because the
+product is that any advocate can register and keep their diary the same
+afternoon. What it creates is a new, empty chamber: its own roles, its own
+capabilities, its own Principal, and the wall above applying from its first
+query. It is not a way into anybody else's.
+
+Staff and clients *inside* a chamber are still issued, never self-
+registered. An advocate adds their colleagues and sends their clients a
+link. Only the advocate signs themselves up.
+
+Every chamber starts **unverified**, with whatever enrolment number the
+advocate typed stored as given and treated as proof of nothing. Anybody can
+write "advocate" in a form. Verification deliberately restricts nothing
+about a chamber's own private work — gating that on a manual check would
+mean nobody could start on the day they joined — but it is what the
+platform admin acts on, and what anything published in a chamber's name
+will depend on.
+
+The rate limit on sign-up is loose on purpose (ten per address per six
+hours). Mobile carriers here put very large numbers of people behind one
+address and a courts building shares one, so a tight limit would turn away
+real advocates far more often than it would stop anybody. What answers a
+flood of invented chambers is that each starts unverified and can be
+suspended, not the throttle.
+
+### Who signs in with what
+
+The two audiences differ, so their sign-ins do.
+
+**Advocates and their staff sign in with an email address**, unique across
+the platform. An address is already one person's and needs no chamber named
+beside it, which is what lets `users.username` become a *handle* — unique
+within the chamber, and what signs a case update. Two chambers may each
+have a `naveed.ahmad`; before this, the second advocate to join would have
+been told the name was taken by somebody in a chamber they cannot see.
+
+**Clients sign in with a username, inside a chamber named by their link.**
+A client may well have no email at all — an elderly litigant very often
+does not — so they keep a username, unique within their advocate's chamber,
+and the chamber comes from the link they were sent:
+`/client/login/<chamber-slug>`. The office shows that link beside the
+username and password when portal access is issued, and copies all three
+together. It is also why a client of one chamber cannot reach another's:
+the username alone does not identify anybody.
+
+An unknown chamber at sign-in is answered exactly like a wrong password, so
+the form cannot be used to find out who is on the platform. Sign-in
+throttling for the portal is keyed by chamber *and* username, so a client
+of one advocate cannot be locked out by somebody guessing at the same
+common name in another chamber.
+
+#### Accounts that pre-date email sign-in
+
+The migration gave every existing account an address of
+`<username>@<chamber-slug>.invalid`. `.invalid` is reserved by RFC 2606, so
+it can never be a real domain and can never collide with somebody's real
+address. It signs in perfectly well, but nothing can be sent to it, so the
+office carries one line at the top of every screen for whoever holds one,
+pointing at **My Account** — the one office screen that needs no capability
+at all, because a person must always be able to change their own sign-in
+without asking anybody. Changing the address needs the password as well as
+the session: an unattended signed-in screen must not be enough to move
+somebody's sign-in to an address the person at the keyboard controls.
 
 Push tokens are keyed by the token, which is global on purpose: one handset
 is one device wherever its owner practises, and a phone signing in as
@@ -226,8 +290,10 @@ the same browser must not sign you out of the office.
 
 ### Issuing a client a sign-in
 
-There is no self-registration. Until Phase 5 puts this behind the Clients
-screen, portal credentials are issued from the command line:
+Clients do not register themselves — their advocate issues the sign-in. The
+Clients screen does it in two clicks for anyone with `clients.portal`, and
+shows the chamber's own link beside the username and password, with a
+button that copies all three. From the command line:
 
 ```bash
 cd backend
@@ -248,13 +314,21 @@ checked before anything is read down a telephone.
 It creates the client if needed, switches the portal on, generates a password
 and prints it **once** — only a bcrypt hash is stored, so it cannot be shown
 again; run it again to issue a fresh one. The client is made to choose their
-own password before they can go any further.
+own password before they can go any further. It prints the chamber's sign-in
+link too: the username alone will not get a client anywhere, which is exactly
+what stops another chamber's client reaching this one.
 
-A chamber account is issued the same way, with the role it is to hold:
+A chamber account is issued the same way, with the role it is to hold and the
+address it will sign in with:
 
 ```bash
-npm run staff:issue -- "Naveed Ahmad" associate
+npm run staff:issue -- "Naveed Ahmad" associate naveed@example.com
 ```
+
+The address is required for a new account and optional when resetting an
+existing one, which then keeps the address it has. The handle it prints is
+what signs their entries inside the chamber; the address is what they type
+at sign-in.
 
 To see the portal and the diary doing their job before Phase 5 builds the
 office screens that create real cases, there is one worked example:

@@ -3,6 +3,7 @@
 import { AlertTriangle, Check, KeyRound, Copy } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useMe } from "@/lib/use-auth";
 import { useSetPortalAccess } from "@/lib/use-office";
 
 /**
@@ -27,6 +28,15 @@ export function PortalAccess({
   mustChangePassword: boolean;
 }) {
   const set = useSetPortalAccess(clientId);
+  const me = useMe();
+  // The chamber is part of signing in, so a client needs the chamber's own
+  // link as well as their username — which is exactly what stops another
+  // advocate's client reaching this one's portal.
+  const chamberPath = me.data?.chamber?.clientLoginPath ?? "";
+  const loginLink =
+    typeof window === "undefined" || !chamberPath
+      ? chamberPath
+      : `${window.location.origin}${chamberPath}`;
   const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
   const [fees, setFees] = useState(showFees);
   const [copied, setCopied] = useState(false);
@@ -77,11 +87,15 @@ export function PortalAccess({
           </p>
           <dl className="space-y-1 font-mono text-sm text-ink">
             <div className="flex gap-3">
-              <dt className="w-20 text-ink-soft">username</dt>
+              <dt className="w-20 shrink-0 text-ink-soft">link</dt>
+              <dd className="break-all">{loginLink}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-20 shrink-0 text-ink-soft">username</dt>
               <dd>{issued.username}</dd>
             </div>
             <div className="flex gap-3">
-              <dt className="w-20 text-ink-soft">password</dt>
+              <dt className="w-20 shrink-0 text-ink-soft">password</dt>
               <dd>{issued.password}</dd>
             </div>
           </dl>
@@ -89,19 +103,23 @@ export function PortalAccess({
             type="button"
             onClick={() => {
               void navigator.clipboard
-                ?.writeText(`Username: ${issued.username}\nPassword: ${issued.password}`)
+                ?.writeText(
+                  `Sign in here: ${loginLink}\nUsername: ${issued.username}\nPassword: ${issued.password}`
+                )
                 .then(() => setCopied(true))
                 .catch(() => undefined);
             }}
             className="flex items-center gap-1.5 text-xs font-semibold text-gold hover:underline"
           >
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            {copied ? "Copied" : "Copy both"}
+            {copied ? "Copied" : "Copy all three"}
           </button>
           <p className="text-xs leading-5 text-ink-soft">
-            Only a scrambled form is stored, so nobody in the office — or
-            anyone who takes a copy of the database — can read it back. The
-            client is made to choose their own on first sign-in.
+            Send the link with the username — the chamber is part of signing in, so the
+            username alone will not get them there. Only a scrambled form of the password
+            is stored, so nobody in the office, or anyone who takes a copy of the
+            database, can read it back. The client is made to choose their own on first
+            sign-in.
           </p>
         </div>
       )}

@@ -14,6 +14,7 @@ import {
   Settings,
   ShieldCheck,
   Star,
+  UserCog,
   Users,
   Wallet,
 } from "lucide-react";
@@ -78,6 +79,9 @@ export const OFFICE_NAV: NavSection[] = [
       { label: "Enquiries", href: "/office/enquiries", icon: Inbox, cap: "enquiries.view" },
       { label: "Accounts", href: "/office/users", icon: FileText, cap: "users.manage" },
       { label: "Roles & Access", href: "/office/roles", icon: ShieldCheck, cap: "users.manage" },
+      // No capability: everybody must be able to change their own sign-in
+      // without having to ask somebody who holds users.manage.
+      { label: "My Account", href: "/office/account", icon: UserCog },
     ],
   },
 ];

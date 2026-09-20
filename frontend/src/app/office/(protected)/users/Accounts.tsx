@@ -12,6 +12,9 @@ import {
 
 export type Account = {
   id: number;
+  /** What they sign in with. */
+  email: string;
+  /** Their handle inside this chamber — what signs a case update. */
   username: string;
   fullName: string;
   role: string;
@@ -22,7 +25,15 @@ const input =
   "w-full rounded-md border border-rule bg-ground px-3 py-2 text-sm text-ink focus:border-gold focus:outline-none";
 
 /** A password, shown once. The same treatment as a client's. */
-function IssuedPassword({ username, password }: { username: string; password: string }) {
+function IssuedPassword({
+  email,
+  username,
+  password,
+}: {
+  email: string;
+  username: string;
+  password: string;
+}) {
   return (
     <div className="space-y-2 rounded-card border border-gold/40 bg-gold-wash p-4">
       <p className="flex items-start gap-2 text-sm font-semibold text-ink">
@@ -31,16 +42,22 @@ function IssuedPassword({ username, password }: { username: string; password: st
       </p>
       <dl className="space-y-1 font-mono text-sm text-ink">
         <div className="flex gap-3">
-          <dt className="w-20 text-ink-soft">username</dt>
-          <dd>{username}</dd>
+          <dt className="w-20 shrink-0 text-ink-soft">sign in</dt>
+          <dd className="break-all">{email}</dd>
         </div>
         <div className="flex gap-3">
-          <dt className="w-20 text-ink-soft">password</dt>
+          <dt className="w-20 shrink-0 text-ink-soft">password</dt>
           <dd>{password}</dd>
+        </div>
+        <div className="flex gap-3">
+          <dt className="w-20 shrink-0 text-ink-soft">handle</dt>
+          <dd>{username}</dd>
         </div>
       </dl>
       <p className="text-xs leading-5 text-ink-soft">
-        Only a scrambled form is stored. They must choose their own on first sign-in.
+        They sign in with the address, not the handle — the handle is what signs their
+        entries here. Only a scrambled form of the password is stored, and they must
+        choose their own on first sign-in.
       </p>
     </div>
   );
@@ -60,7 +77,7 @@ function Row({ account, roles }: { account: Account; roles: { roleKey: string; l
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="min-w-40 flex-1">
           <span className="block font-medium text-ink">{account.fullName}</span>
-          <span className="block text-xs text-ink-soft">{account.username}</span>
+          <span className="block text-xs break-all text-ink-soft">{account.email}</span>
         </span>
 
         <select
@@ -126,7 +143,13 @@ function Row({ account, roles }: { account: Account; roles: { roleKey: string; l
         </button>
       </div>
 
-      {issued && <IssuedPassword username={account.username} password={issued} />}
+      {issued && (
+        <IssuedPassword
+          email={account.email}
+          username={account.username}
+          password={issued}
+        />
+      )}
       {error && <p className="text-sm text-danger">{error}</p>}
     </li>
   );
@@ -143,6 +166,7 @@ export function Accounts({
   const [adding, setAdding] = useState(false);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   /**
    * Deliberately unset.
    *
@@ -153,14 +177,18 @@ export function Accounts({
    * choice has to be made.
    */
   const [role, setRole] = useState("");
-  const [issued, setIssued] = useState<{ username: string; password: string } | null>(null);
+  const [issued, setIssued] = useState<{
+    email: string;
+    username: string;
+    password: string;
+  } | null>(null);
   const [error, setError] = useState("");
 
   return (
     <div className="space-y-4">
       {adding ? (
         <div className="space-y-3 rounded-card border border-dashed border-rule p-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <label htmlFor="new-name" className="block text-sm font-medium text-ink">
                 Name
@@ -178,10 +206,25 @@ export function Accounts({
               />
             </div>
             <div className="space-y-1.5">
+              <label htmlFor="new-email" className="block text-sm font-medium text-ink">
+                Email
+              </label>
+              <input
+                id="new-email"
+                type="email"
+                autoCapitalize="none"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={input}
+              />
+              <p className="text-xs text-ink-soft">What they sign in with.</p>
+            </div>
+            <div className="space-y-1.5">
               <label htmlFor="new-username" className="block text-sm font-medium text-ink">
-                Username
+                Handle
               </label>
               <input id="new-username" value={username} onChange={(e) => setUsername(e.target.value)} className={input} />
+              <p className="text-xs text-ink-soft">Signs their entries here.</p>
             </div>
             <div className="space-y-1.5">
               <label htmlFor="new-role" className="block text-sm font-medium text-ink">
@@ -208,18 +251,20 @@ export function Accounts({
                 create.isPending ||
                 fullName.trim().length < 2 ||
                 username.trim().length < 3 ||
+                !email.includes("@") ||
                 role === ""
               }
               onClick={() => {
                 setError("");
                 create.mutate(
-                  { fullName, username, role },
+                  { fullName, username, email, role },
                   {
                     onSuccess: (r) => {
-                      setIssued({ username: r.username, password: r.password });
+                      setIssued({ email: r.email, username: r.username, password: r.password });
                       setAdding(false);
                       setFullName("");
                       setUsername("");
+                      setEmail("");
                       setRole("");
                     },
                     onError: (err) =>
@@ -241,7 +286,13 @@ export function Accounts({
         </Button>
       )}
 
-      {issued && <IssuedPassword username={issued.username} password={issued.password} />}
+      {issued && (
+        <IssuedPassword
+          email={issued.email}
+          username={issued.username}
+          password={issued.password}
+        />
+      )}
 
       <ul className="space-y-2">
         {accounts.map((a) => (

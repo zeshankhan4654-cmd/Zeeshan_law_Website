@@ -8,7 +8,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireStaff, staffSession, tenant } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
-import { changePasswordSchema, loginSchema } from "../validation/auth.schema.js";
+import { changeEmailSchema, changePasswordSchema, loginSchema } from "../validation/auth.schema.js";
 
 export const authRouter = Router();
 
@@ -25,29 +25,47 @@ async function capabilitiesOf(firmId: number, role: string): Promise<string[] | 
 
 const LOGIN_SCOPE = "office";
 
+/**
+ * The chamber this session is in, as the office needs to show it.
+ *
+ * Its name heads the office, and its slug is the link an advocate gives
+ * their clients — so the office can show that link rather than the
+ * advocate having to be told it once and remember it.
+ */
+async function chamberOf(firmId: number) {
+  const firm = await prisma.firm.findUnique({
+    where: { id: firmId },
+    select: { slug: true, name: true, verified: true },
+  });
+  if (!firm) return null;
+  return { ...firm, clientLoginPath: `/client/login/${firm.slug}` };
+}
+
 authRouter.post(
   "/login",
   validate(loginSchema),
   asyncHandler(async (req, res) => {
-    const { username, password } = req.body as { username: string; password: string };
+    const { email, password } = req.body as { email: string; password: string };
     const ip = req.ip ?? "unknown";
 
-    const wait = await lockMinutesRemaining(LOGIN_SCOPE, username, ip);
+    const wait = await lockMinutesRemaining(LOGIN_SCOPE, email, ip);
     if (wait > 0) {
       throw new ApiError(429, `Too many attempts. Try again in ${wait} minute${wait === 1 ? "" : "s"}.`);
     }
 
     // Unscoped by necessity: signing in is how we learn which chamber this
-    // person belongs to. Everything after this point is scoped to it.
+    // person belongs to. Everything after this point is scoped to it. The
+    // address is unique across the platform, so no chamber has to be named
+    // here — which is the whole reason sign-in moved to email.
     const user = await prisma.user.findUnique({
-      where: { username },
+      where: { email },
       include: { firm: { select: { status: true, suspendedReason: true } } },
     });
     const valid = user ? await verifyPassword(password, user.passwordHash) : false;
 
     if (!user || !valid) {
-      await recordFailure(LOGIN_SCOPE, username, ip);
-      throw new ApiError(401, "Wrong username or password.");
+      await recordFailure(LOGIN_SCOPE, email, ip);
+      throw new ApiError(401, "Wrong email or password.");
     }
 
     // Only reachable by someone who proved they hold the password, so the
@@ -60,7 +78,7 @@ authRouter.post(
       );
     }
 
-    await clearFailures(LOGIN_SCOPE, username, ip);
+    await clearFailures(LOGIN_SCOPE, email, ip);
 
     const token = signSession({
       kind: "staff",
@@ -79,11 +97,17 @@ authRouter.post(
     res.cookie(SESSION_COOKIE, token, sessionCookieOptions);
     res.json({
       id: user.id,
+      email: user.email,
       username: user.username,
       fullName: user.fullName,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      // A placeholder written by the migration, which the holder should
+      // replace. The office shell says so rather than leaving them to
+      // discover it when a password reset has nowhere to go.
+      emailIsPlaceholder: user.email.endsWith(".invalid"),
       capabilities,
+      chamber: await chamberOf(user.firmId),
       token,
     });
   })
@@ -105,11 +129,14 @@ authRouter.get(
 
     res.json({
       id: user.id,
+      email: user.email,
       username: user.username,
       fullName: user.fullName,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      emailIsPlaceholder: user.email.endsWith(".invalid"),
       capabilities: await capabilitiesOf(user.firmId, user.role),
+      chamber: await chamberOf(user.firmId),
     });
   })
 );
@@ -140,6 +167,41 @@ authRouter.post(
       },
     });
 
+    res.status(204).end();
+  })
+);
+
+/**
+ * Replacing the address you sign in with.
+ *
+ * Needs the password, not just the session: an unattended signed-in screen
+ * must not be enough to move somebody's sign-in to an address the person
+ * at the keyboard controls.
+ */
+authRouter.post(
+  "/change-email",
+  requireStaff,
+  validate(changeEmailSchema),
+  asyncHandler(async (req, res) => {
+    const { password, email } = req.body as { password: string; email: string };
+
+    const { db } = tenant(req);
+    const user = await db.user.findUnique({ where: { id: staffSession(req).sub } });
+    if (!user) throw new ApiError(401, "Your session has expired. Sign in again.");
+
+    if (!(await verifyPassword(password, user.passwordHash))) {
+      throw new ApiError(400, "That is not your password.");
+    }
+
+    // Unscoped, because the address is unique across the platform. It says
+    // only that some account somewhere holds it, which the person is about
+    // to discover anyway by being unable to use it.
+    const taken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (taken && taken.id !== user.id) {
+      throw new ApiError(400, "Another account already signs in with that address.");
+    }
+
+    await db.user.update({ where: { id: user.id }, data: { email } });
     res.status(204).end();
   })
 );
