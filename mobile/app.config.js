@@ -25,9 +25,15 @@ const SITE_HOST = process.env.EXPO_PUBLIC_SITE_HOST || "arbitratorandlaw.com";
 
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
-  name: "The Arbitrator & Law Associates",
-  slug: "arbitrator-law",
-  scheme: "arbitratorlaw",
+  /**
+   * The product's name, in one place.
+   *
+   * Every screen reads this through `Constants.expoConfig.name` rather
+   * than writing it out, so it is changed here and nowhere else.
+   */
+  name: "Lawyer360",
+  slug: "lawyer360",
+  scheme: "lawyer360",
   version: "0.1.0",
   orientation: "portrait",
   userInterfaceStyle: "light",
@@ -40,11 +46,15 @@ module.exports = {
   },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.arbitratorandlaw.app",
+    // Permanent once the app is in a store: Apple and Google will not let
+    // it change afterwards. Set before the first submission, deliberately.
+    bundleIdentifier: "com.lawyer360.app",
     associatedDomains: [`applinks:${SITE_HOST}`],
   },
   android: {
-    package: "com.arbitratorandlaw.app",
+    // As with iOS: fixed for the life of the listing, and it is visible in
+    // the Play Store address.
+    package: "com.lawyer360.app",
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#17140F",

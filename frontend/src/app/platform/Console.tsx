@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api";
+import { PLATFORM_NAME } from "@/lib/platform-brand";
 import {
   useOverview,
   useRestoreChamber,
@@ -63,12 +64,14 @@ export function Console() {
   return (
     <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
       <header className="space-y-1">
-        <p className="text-xs font-semibold tracking-[0.14em] text-gold uppercase">Platform</p>
+        <p className="text-xs font-semibold tracking-[0.14em] text-gold uppercase">
+          {PLATFORM_NAME}
+        </p>
         <h1 className="font-display text-2xl text-ink">Chambers</h1>
         <p className="max-w-2xl text-sm leading-6 text-ink-soft">
-          Every chamber on the platform, how large it is, and whether it is active. What is
-          inside a chamber — its clients, its files, its messages — is not shown here and is
-          not reachable from here.
+          Every chamber on {PLATFORM_NAME}, how large it is, and whether it is active. What
+          is inside a chamber — its clients, its files, its messages — is not shown here and
+          is not reachable from here.
         </p>
       </header>
 

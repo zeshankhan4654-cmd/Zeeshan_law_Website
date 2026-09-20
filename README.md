@@ -1,8 +1,18 @@
-# The Arbitrator & Law Associates — website, client portal & office system
+# Lawyer360 — chambers, client portals and a shared library
 
-A rebuild of the firm's chambers system on a modern stack, replacing the
-original PHP/MariaDB build. Delivered in phases; each phase is one pushed,
-working increment.
+A platform any advocate can register on: their own diary, their clients'
+files, their chamber's accounts and their own library, private to their
+chamber and reachable from a phone in a corridor outside court. Alongside
+it, a library of judgments and research that every chamber contributes to
+and every advocate can read.
+
+It began as a rebuild of **The Arbitrator & Law Associates**' own chambers
+system, replacing the original PHP/MariaDB build, and that chamber is
+still the first tenant — this deployment also serves its public website at
+arbitratorandlaw.com. Everything a chamber does is walled off from every
+other; see **Chambers** below, which is the most important section here.
+
+Delivered in phases; each phase is one pushed, working increment.
 
 ## Stack
 
@@ -1054,7 +1064,7 @@ A **client** signs in with their username *and their chamber*. The chamber
 comes from the link their advocate sent them, and the app claims that path:
 tapping `https://<site>/client/login/<chamber>` on a phone with the app
 installed opens the sign-in screen with the chamber already filled in
-rather than the browser. `arbitratorlaw://client/<chamber>` does the same,
+rather than the browser. `lawyer360://client/<chamber>` does the same,
 which is what a QR code in a waiting room would carry. Typed by hand
 otherwise — the field says it is the last part of the link.
 
@@ -1069,13 +1079,27 @@ Each account screen names its own chamber, warns an advocate whose address
 is still a `.invalid` placeholder, and says plainly when a chamber is not
 yet verified and what that does and does not restrict.
 
-#### The app's name
+#### The product's name
 
-`app.config.js` still calls it *The Arbitrator & Law Associates*, which is
-wrong for an app every advocate downloads — and naming the product is not
-a decision to make in a component. Every screen reads it from that one
-config field (`Constants.expoConfig.name`), so renaming it is one line in
-one file and the whole app follows.
+The platform is **Lawyer360**. It is written in exactly two places:
+`name` in `mobile/app.config.js`, which every screen of the app reads
+through `Constants.expoConfig.name`, and `PLATFORM_NAME` in
+`frontend/src/lib/platform-brand.ts`, which sign-up and the console read.
+Renaming it is those two lines.
+
+It is deliberately kept apart from any chamber's name. A chamber's public
+website is that advocate's and carries their name from Site Settings;
+sign-up and the console belong to the platform every chamber sits on. The
+office in between shows whichever chamber you are signed into. The three
+must not drift into each other, which is why none of them writes a name
+out in place.
+
+The store identifiers — `com.lawyer360.app` on both platforms — were set
+before the first submission on purpose. Apple and Google both fix them
+for the life of a listing, and the Android one is visible in the Play
+Store address. They use the product's name rather than the first
+chamber's domain, which is a choice worth knowing about: reverse-DNS
+convention would use a domain the publisher controls.
 
 #### How the phone holds a session
 

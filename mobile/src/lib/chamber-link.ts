@@ -12,7 +12,7 @@ import { useEffect } from "react";
  * is half of what identifies them and it is not something they should have
  * to read out of a URL.
  *
- * Also accepts the app's own scheme, `arbitratorlaw://client/<chamber>`,
+ * Also accepts the app's own scheme, `lawyer360://client/<chamber>`,
  * which is what a QR code in a chamber's waiting room would carry.
  *
  * Nothing here signs anybody in. It fills in one field.

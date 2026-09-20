@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -6,6 +7,9 @@ import { useNotificationRouting } from "@/lib/notification-routing";
 import { QueryProvider } from "@/lib/query-provider";
 import { SessionProvider } from "@/lib/session";
 import "../global.css";
+
+/** The product's name, from app.config.js — see the note on the home screen. */
+const APP_NAME = Constants.expoConfig?.name ?? "Chambers";
 
 /** Inside the providers, because routing a tapped notification needs the session. */
 function AppStack() {
@@ -23,7 +27,7 @@ function AppStack() {
           contentStyle: { backgroundColor: "#faf8f5" },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "The Chamber" }} />
+        <Stack.Screen name="index" options={{ title: APP_NAME }} />
         <Stack.Screen name="library/index" options={{ title: "Legal Research" }} />
         <Stack.Screen name="library/judgments" options={{ title: "Judgments" }} />
         <Stack.Screen name="library/[id]" options={{ title: "", headerBackTitle: "Library" }} />

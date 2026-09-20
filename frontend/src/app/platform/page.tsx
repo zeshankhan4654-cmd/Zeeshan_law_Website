@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation";
+import { platformTitle } from "@/lib/platform-brand";
 import { getSessionUser } from "@/lib/session";
 import { Console } from "./Console";
 
-export const metadata = { title: "Platform", robots: { index: false, follow: false } };
+export const metadata = {
+  title: platformTitle("Chambers"),
+  robots: { index: false, follow: false },
+};
 
 /**
  * The platform console — every chamber on the platform, and the two things

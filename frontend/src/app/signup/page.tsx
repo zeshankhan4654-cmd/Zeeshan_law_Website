@@ -2,11 +2,12 @@ import { Building2, Lock, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/site/Logo";
+import { PLATFORM_NAME, platformTitle } from "@/lib/platform-brand";
 import { getSessionUser } from "@/lib/session";
 import { SignupForm } from "./SignupForm";
 
 export const metadata = {
-  title: "Register your chamber",
+  title: platformTitle("Register your chamber"),
   description:
     "Any advocate can keep their diary, their clients' files and their own library here, private to their chamber.",
 };
@@ -32,7 +33,7 @@ export default async function Signup() {
             <span className="grid size-10 place-items-center rounded-md bg-gold-wash text-gold">
               <Logo className="size-6" />
             </span>
-            <span className="text-sm leading-tight font-semibold">Advocates&rsquo; chambers</span>
+            <span className="text-sm leading-tight font-semibold">{PLATFORM_NAME}</span>
           </Link>
 
           <div className="space-y-1.5">
