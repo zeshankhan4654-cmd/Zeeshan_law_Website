@@ -1,14 +1,21 @@
 import {
+  BookOpen,
   Calendar,
   FileText,
   Folder,
   Gauge,
   Inbox,
+  Landmark,
+  Layers,
+  MessagesSquare,
   Newspaper,
+  PlayCircle,
+  Search,
   Settings,
   ShieldCheck,
   Star,
   Users,
+  Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -26,12 +33,9 @@ export type NavSection = {
 };
 
 /**
- * The office sidebar.
- *
- * Only screens that exist are listed. The original build's full menu also
- * had the communications diary, official fees, office expenses and the
- * library editors; those return here as they are built. A sidebar item that
- * leads nowhere is worse than one that is not there yet.
+ * The office sidebar — every screen the chamber has, grouped as the
+ * original build grouped them. Each item names the capability that makes it
+ * visible, so a colleague's sidebar is shorter than the Principal's.
  */
 export const OFFICE_NAV: NavSection[] = [
   {
@@ -46,6 +50,18 @@ export const OFFICE_NAV: NavSection[] = [
     items: [
       { label: "Cases", href: "/office/cases", icon: Folder, cap: "cases.view" },
       { label: "Clients", href: "/office/clients", icon: Users, cap: "clients.view" },
+      { label: "Communications", href: "/office/communications", icon: MessagesSquare, cap: "comms.view" },
+      { label: "Professional Fees", href: "/office/fees", icon: Wallet, cap: "money.view" },
+      { label: "Official Fees", href: "/office/official-fees", icon: Landmark, cap: "money.view" },
+      { label: "Office Expenses", href: "/office/expenses", icon: Layers, cap: "money.view" },
+    ],
+  },
+  {
+    heading: "Library",
+    items: [
+      { label: "Judgments", href: "/office/library/judgments", icon: BookOpen, cap: "library.view" },
+      { label: "Legal Research", href: "/office/library/research", icon: Search, cap: "library.view" },
+      { label: "Videos & Lectures", href: "/office/library/media", icon: PlayCircle, cap: "library.view" },
     ],
   },
   {
