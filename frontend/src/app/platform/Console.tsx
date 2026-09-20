@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CheckCircle2, PauseCircle, Search, ShieldCheck, Users } from "lucide-react";
+import { Building2, CheckCircle2, Library, PauseCircle, Search, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import {
   type PlatformAction,
   type PlatformTotals,
 } from "@/lib/use-platform";
+import { Queue } from "./Queue";
 
 const input =
   "rounded-md border border-rule bg-surface px-3 py-2 text-sm text-ink focus:border-gold focus:outline-none";
@@ -110,6 +111,7 @@ export function Console() {
               No chamber matches that.
             </p>
           )}
+          <Queue />
           <Trail actions={data.actions} />
         </>
       )}
@@ -122,7 +124,7 @@ function Totals({ totals }: { totals: PlatformTotals }) {
     { icon: Building2, label: "Chambers", value: totals.chambers },
     { icon: ShieldCheck, label: "Verified", value: totals.verified },
     { icon: PauseCircle, label: "Suspended", value: totals.suspended },
-    { icon: Users, label: "Advocates & staff", value: totals.staff },
+    { icon: Library, label: "Waiting to be read", value: totals.pending },
   ];
 
   return (

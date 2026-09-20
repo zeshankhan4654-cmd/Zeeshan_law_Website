@@ -81,6 +81,12 @@ export default async function Resources({
                 {item.summary && (
                   <p className="text-sm leading-6 text-ink-soft">{item.summary}</p>
                 )}
+                {/* Whose work it is. The library now carries entries from
+                    chambers a reader has never heard of, and who wrote a
+                    note is part of deciding whether to rely on it. */}
+                <p className="mt-auto pt-2 text-xs text-ink-soft">
+                  Contributed by {item.firm.name}
+                </p>
               </article>
             </Reveal>
           ))}
@@ -96,10 +102,11 @@ export default async function Resources({
           <Gavel className="mt-0.5 size-5 shrink-0 text-gold" strokeWidth={1.6} />
           <p className="text-sm leading-6 text-ink-soft">
             <span className="font-semibold text-ink">
-              Judgments: {counts.judgments} published.
+              Judgments: {counts.judgments} in the library.
             </span>{" "}
-            The chamber only publishes a citation it has checked against the
-            report itself, so this section fills slowly and deliberately.
+            Chambers across the platform contribute, and nothing appears until it has
+            been read and its citation checked against the report — so this section
+            fills slowly and deliberately. Each entry names the chamber that wrote it.
           </p>
         </div>
       </section>

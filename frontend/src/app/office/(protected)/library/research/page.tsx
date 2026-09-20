@@ -6,7 +6,7 @@ import { LibraryEditor, type FieldSpec } from "../LibraryEditor";
 
 export const metadata = { title: "Legal research — Office" };
 
-type Row = { id: number; title: string; published: boolean; topic: string };
+type Row = { id: number; title: string; published: boolean; topic: string; shareState: string; shareNote: string };
 
 const FIELDS: FieldSpec[] = [
   { key: "title", label: "Title", full: true },
@@ -25,7 +25,7 @@ const FIELDS: FieldSpec[] = [
 
 export default async function ResearchAdmin() {
   const [data, user] = await Promise.all([
-    officeFetch<{ items: Row[]; published: number }>("/api/office/library/research"),
+    officeFetch<{ items: Row[]; published: number; shared: number }>("/api/office/library/research"),
     getSessionUser(),
   ]);
   if (!data) return <NotPermitted />;
@@ -34,7 +34,7 @@ export default async function ResearchAdmin() {
     <>
       <PageHeading
         title="Legal research"
-        subtitle={`${data.published} on the public website, ${data.items.length - data.published} in draft`}
+        subtitle={`${data.published} on your website, ${data.items.length - data.published} in draft` + (data.shared ? `, ${data.shared} in the shared library` : "")}
       />
       <LibraryEditor
         kind="research"

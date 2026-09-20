@@ -482,29 +482,64 @@ model Judgment {
   sizeBytes    Int       @default(0) @map("size_bytes")
   published    Boolean   @default(false)
   createdAt    DateTime  @default(now()) @map("created_at")
+  /// Whether this has been contributed to the shared library, and how far
+  /// that has got: "private" | "pending" | "approved" | "rejected".
+  ///
+  /// A separate axis from `published`. `published` is the chamber's own
+  /// decision about its own website; this is a decision to put the entry in
+  /// front of every advocate on the platform, which only the platform admin
+  /// can complete. An approved entry is a legal citation another advocate
+  /// may rely on in court, so nothing reaches that state without somebody
+  /// having checked it.
+  shareState   String    @default("private") @map("share_state")
+  /// When it was approved. Null until then.
+  sharedAt     DateTime? @map("shared_at")
+  /// The moderator's reason, shown to the chamber that submitted it. A
+  /// rejection that does not say why is one the chamber cannot act on.
+  shareNote    String    @default("") @map("share_note")
+  /// The handle of whoever submitted it, for the chamber's own record.
+  submittedBy  String    @default("") @map("submitted_by")
 
-  /// The chamber that wrote it. Sharing it with every other chamber is a
-  /// separate act, moderated by the platform — see M4.
+  /// The chamber that wrote it. Sharing it with every other chamber is the
+  /// separate, moderated act above.
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
   @@index([firmId])
+  @@index([shareState, sharedAt])
   @@map("judgments")
 }
 
 model Research {
-  id         Int      @id @default(autoincrement())
-  title      String
-  topic      String   @default("")
-  summary    String   @default("")
-  body       String   @default("")
-  tags       String   @default("")
-  caseId     Int?     @map("case_id")
-  storedName String   @default("") @map("stored_name")
-  origName   String   @default("") @map("orig_name")
-  sizeBytes  Int      @default(0) @map("size_bytes")
-  published  Boolean  @default(false)
-  createdAt  DateTime @default(now()) @map("created_at")
+  id          Int       @id @default(autoincrement())
+  title       String
+  topic       String    @default("")
+  summary     String    @default("")
+  body        String    @default("")
+  tags        String    @default("")
+  caseId      Int?      @map("case_id")
+  storedName  String    @default("") @map("stored_name")
+  origName    String    @default("") @map("orig_name")
+  sizeBytes   Int       @default(0) @map("size_bytes")
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  /// Whether this has been contributed to the shared library, and how far
+  /// that has got: "private" | "pending" | "approved" | "rejected".
+  ///
+  /// A separate axis from `published`. `published` is the chamber's own
+  /// decision about its own website; this is a decision to put the entry in
+  /// front of every advocate on the platform, which only the platform admin
+  /// can complete. An approved entry is a legal citation another advocate
+  /// may rely on in court, so nothing reaches that state without somebody
+  /// having checked it.
+  shareState  String    @default("private") @map("share_state")
+  /// When it was approved. Null until then.
+  sharedAt    DateTime? @map("shared_at")
+  /// The moderator's reason, shown to the chamber that submitted it. A
+  /// rejection that does not say why is one the chamber cannot act on.
+  shareNote   String    @default("") @map("share_note")
+  /// The handle of whoever submitted it, for the chamber's own record.
+  submittedBy String    @default("") @map("submitted_by")
 
   case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
@@ -512,6 +547,7 @@ model Research {
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
   @@index([firmId])
+  @@index([shareState, sharedAt])
   @@index([caseId])
   @@map("research")
 }
@@ -529,11 +565,29 @@ model Media {
   sizeBytes   Int       @default(0) @map("size_bytes")
   published   Boolean   @default(false)
   createdAt   DateTime  @default(now()) @map("created_at")
+  /// Whether this has been contributed to the shared library, and how far
+  /// that has got: "private" | "pending" | "approved" | "rejected".
+  ///
+  /// A separate axis from `published`. `published` is the chamber's own
+  /// decision about its own website; this is a decision to put the entry in
+  /// front of every advocate on the platform, which only the platform admin
+  /// can complete. An approved entry is a legal citation another advocate
+  /// may rely on in court, so nothing reaches that state without somebody
+  /// having checked it.
+  shareState  String    @default("private") @map("share_state")
+  /// When it was approved. Null until then.
+  sharedAt    DateTime? @map("shared_at")
+  /// The moderator's reason, shown to the chamber that submitted it. A
+  /// rejection that does not say why is one the chamber cannot act on.
+  shareNote   String    @default("") @map("share_note")
+  /// The handle of whoever submitted it, for the chamber's own record.
+  submittedBy String    @default("") @map("submitted_by")
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
   @@index([firmId])
+  @@index([shareState, sharedAt])
   @@map("media")
 }
 

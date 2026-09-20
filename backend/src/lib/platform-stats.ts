@@ -222,3 +222,124 @@ export async function recentPlatformActions(limit: number, firmId?: number) {
     take: limit,
   });
 }
+
+// ---------------------------------------------------------------------------
+// The shared library's moderation queue
+// ---------------------------------------------------------------------------
+//
+// The one place the platform admin reads a chamber's *content* — and only
+// because the chamber asked them to. Nothing reaches this queue except by a
+// chamber deliberately offering it, and what is shown is exactly what that
+// chamber is asking to put in front of every other advocate. It is the
+// opposite of the rule above rather than an exception to it: reading an
+// entry is the whole point of being asked to approve it.
+
+export type SubmittedEntry = {
+  kind: "judgment" | "research" | "media";
+  id: number;
+  title: string;
+  /** The fields a moderator needs to check it against the report. */
+  citation: string;
+  court: string;
+  principle: string;
+  summary: string;
+  tags: string;
+  sourceUrl: string;
+  submittedBy: string;
+  shareState: string;
+  shareNote: string;
+  chamber: { id: number; name: string; slug: string; verified: boolean };
+};
+
+/** Everything a chamber has offered and nobody has answered yet. */
+export async function submissionQueue(state = "pending"): Promise<SubmittedEntry[]> {
+  const where = { shareState: state };
+  const chamber = { select: { id: true, name: true, slug: true, verified: true } };
+
+  const [judgments, research, media] = await Promise.all([
+    prisma.judgment.findMany({
+      where,
+      orderBy: { id: "asc" },
+      select: {
+        id: true, title: true, citation: true, court: true, principle: true,
+        summary: true, tags: true, sourceUrl: true, submittedBy: true,
+        shareState: true, shareNote: true, firm: chamber,
+      },
+    }),
+    prisma.research.findMany({
+      where,
+      orderBy: { id: "asc" },
+      select: {
+        id: true, title: true, topic: true, summary: true, tags: true,
+        submittedBy: true, shareState: true, shareNote: true, firm: chamber,
+      },
+    }),
+    prisma.media.findMany({
+      where,
+      orderBy: { id: "asc" },
+      select: {
+        id: true, title: true, kind: true, description: true, topic: true,
+        url: true, submittedBy: true, shareState: true, shareNote: true, firm: chamber,
+      },
+    }),
+  ]);
+
+  return [
+    ...judgments.map((j) => ({
+      kind: "judgment" as const,
+      id: j.id,
+      title: j.title,
+      citation: j.citation,
+      court: j.court,
+      principle: j.principle,
+      summary: j.summary,
+      tags: j.tags,
+      sourceUrl: j.sourceUrl,
+      submittedBy: j.submittedBy,
+      shareState: j.shareState,
+      shareNote: j.shareNote,
+      chamber: j.firm,
+    })),
+    ...research.map((r) => ({
+      kind: "research" as const,
+      id: r.id,
+      title: r.title,
+      citation: "",
+      court: "",
+      principle: r.topic,
+      summary: r.summary,
+      tags: r.tags,
+      sourceUrl: "",
+      submittedBy: r.submittedBy,
+      shareState: r.shareState,
+      shareNote: r.shareNote,
+      chamber: r.firm,
+    })),
+    ...media.map((m) => ({
+      kind: "media" as const,
+      id: m.id,
+      title: m.title,
+      citation: "",
+      court: m.kind,
+      principle: m.topic,
+      summary: m.description,
+      tags: "",
+      sourceUrl: m.url,
+      submittedBy: m.submittedBy,
+      shareState: m.shareState,
+      shareNote: m.shareNote,
+      chamber: m.firm,
+    })),
+  ];
+}
+
+/** How many are waiting, for the console's badge. */
+export async function pendingCount(): Promise<number> {
+  const where = { shareState: "pending" };
+  const [j, r, m] = await Promise.all([
+    prisma.judgment.count({ where }),
+    prisma.research.count({ where }),
+    prisma.media.count({ where }),
+  ]);
+  return j + r + m;
+}

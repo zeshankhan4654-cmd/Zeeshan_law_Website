@@ -33,6 +33,8 @@ export type PlatformTotals = {
   staff: number;
   clients: number;
   cases: number;
+  /** Library entries chambers have offered and nobody has answered. */
+  pending: number;
 };
 
 export type PlatformAction = {
@@ -104,5 +106,52 @@ export function useSuspendChamber(id: number) {
 export function useRestoreChamber(id: number) {
   return useAction<void>(() =>
     apiFetch(`/api/platform/chambers/${id}/restore`, { method: "POST" })
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The shared library's moderation queue
+// ---------------------------------------------------------------------------
+
+export type Submission = {
+  kind: "judgment" | "research" | "media";
+  id: number;
+  title: string;
+  citation: string;
+  court: string;
+  principle: string;
+  summary: string;
+  tags: string;
+  sourceUrl: string;
+  submittedBy: string;
+  shareState: string;
+  shareNote: string;
+  chamber: { id: number; name: string; slug: string; verified: boolean };
+};
+
+export function useSubmissions(state: "pending" | "approved" | "rejected") {
+  return useQuery({
+    queryKey: ["platform", "submissions", state],
+    queryFn: () => apiFetch<{ items: Submission[] }>(`/api/platform/submissions?state=${state}`),
+  });
+}
+
+/** Approving or turning down one entry. Never in bulk: each is read. */
+export function useModerate(kind: Submission["kind"], id: number) {
+  return useAction<{ approve: boolean; note: string }>((body) =>
+    apiFetch(`/api/platform/submissions/${kind}/${id}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    })
+  );
+}
+
+/** Taking an approved entry back out. It returns to its chamber, not deleted. */
+export function useWithdrawShared(kind: Submission["kind"], id: number) {
+  return useAction<{ note: string }>((body) =>
+    apiFetch(`/api/platform/submissions/${kind}/${id}/withdraw`, {
+      method: "POST",
+      body: JSON.stringify({ approve: false, ...body }),
+    })
   );
 }

@@ -36,6 +36,9 @@ export type PostSummary = {
 
 export type Post = PostSummary & { body: string; tags: string; views: number };
 
+/** The chamber that contributed an entry to the shared library. */
+export type Contributor = { name: string; slug: string; verified: boolean };
+
 export type ResearchSummary = {
   id: number;
   title: string;
@@ -43,6 +46,12 @@ export type ResearchSummary = {
   summary: string;
   tags: string;
   createdAt: string;
+  /**
+   * Whose work it is. An advocate deciding whether to rely on a note needs
+   * to know whose note it is, and the shared library carries entries from
+   * chambers a reader has never heard of.
+   */
+  firm: Contributor;
 };
 
 type Page<T> = { items: T[]; total: number };

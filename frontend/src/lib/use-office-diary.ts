@@ -75,3 +75,25 @@ export function useDeleteLibraryEntry(kind: LibraryKind) {
     apiFetch(`/api/office/library/${kind}/${id}`, { method: "DELETE" })
   );
 }
+
+/**
+ * Offering an entry to the shared library, and taking it back.
+ *
+ * Gated on `library.publish` in the API, for the same reason publishing on
+ * the chamber's own website is: this puts the chamber's name in front of
+ * advocates who have never met them.
+ */
+export function useShareEntry(kind: LibraryKind) {
+  return useRefreshing<{ id: number; share: boolean }, { shareState: string }>(({ id, share }) =>
+    apiFetch(`/api/office/library/${SHARE_PATH[kind]}/${id}/${share ? "share" : "unshare"}`, {
+      method: "POST",
+    })
+  );
+}
+
+/** The office routes are plural; the share routes name one entry. */
+const SHARE_PATH: Record<LibraryKind, string> = {
+  judgments: "judgment",
+  research: "research",
+  media: "media",
+};

@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { hashPassword, verifyPassword } from "../src/lib/password.js";
-import { listChambers } from "../src/lib/platform-stats.js";
+import { listChambers, submissionQueue } from "../src/lib/platform-stats.js";
+import { APPROVED_AND_STANDING, assertChamberMayShare } from "../src/lib/shared-library.js";
 import { prisma } from "../src/lib/prisma.js";
 import { forFirm, scopedModelNames } from "../src/lib/tenant.js";
 
@@ -447,6 +448,113 @@ async function probePlatformAdmin(a: Chamber, b: Chamber): Promise<void> {
   });
 }
 
+/**
+ * The shared library is the one thing meant to cross chambers — so what
+ * keeps it safe is not the wall but the gate. This checks the gate.
+ */
+async function probeSharedLibrary(a: Chamber, b: Chamber): Promise<void> {
+  console.log("\n  The shared library:");
+
+  // Each chamber writes a judgment. Neither has offered it to anybody.
+  const made = new Map<number, number>();
+  for (const chamber of [a, b]) {
+    const j = await chamber.db.judgment.create({
+      data: {
+        firmId: chamber.firm.id,
+        title: `${chamber.firm.name} on limitation`,
+        citation: `2026 XYZ ${chamber.firm.id}`,
+        court: "Peshawar High Court",
+        principle: "Not yet offered to anybody.",
+        // Published on their own site, which must not be the same thing as
+        // being in the shared library.
+        published: true,
+      },
+      select: { id: true },
+    });
+    made.set(chamber.firm.id, j.id);
+  }
+
+  const publicly = async () =>
+    prisma.judgment.findMany({ where: APPROVED_AND_STANDING, select: { id: true } });
+
+  const mine = made.get(a.firm.id) as number;
+  const theirs = made.get(b.firm.id) as number;
+
+  // 1. Publishing on your own site does not share anything.
+  const beforeIds = (await publicly()).map((r) => r.id);
+  if (beforeIds.includes(mine) || beforeIds.includes(theirs)) {
+    fail("publishing on a chamber's own site does not share it", "it appeared publicly");
+  } else {
+    ok("publishing on a chamber's own site does not share it");
+  }
+
+  // 2. Nor does the other chamber see it.
+  expectNothing(
+    "an unshared entry is invisible to the other chamber",
+    await b.db.judgment.findUnique({ where: { id: mine } })
+  );
+
+  // 3. Offering it is not the same as it appearing.
+  await prisma.judgment.update({
+    where: { id: mine },
+    data: { shareState: "pending", submittedBy: "someone" },
+  });
+  const pendingIds = (await publicly()).map((r) => r.id);
+  expectEqual("offering an entry does not publish it", pendingIds.includes(mine), false);
+
+  const queue = await submissionQueue("pending");
+  expectEqual("but it does reach the moderation queue", queue.some((e) => e.id === mine), true);
+
+  // 4. An unverified chamber's work cannot be approved.
+  await prisma.firm.update({ where: { id: a.firm.id }, data: { verified: false } });
+  await expectRefused("an unverified chamber's work cannot be approved", () =>
+    assertChamberMayShare(a.firm.id)
+  );
+
+  // 5. Verified and approved, it appears — and only it.
+  await prisma.firm.update({ where: { id: a.firm.id }, data: { verified: true } });
+  await prisma.judgment.update({
+    where: { id: mine },
+    data: { shareState: "approved", sharedAt: new Date() },
+  });
+
+  const liveIds = (await publicly()).map((r) => r.id);
+  expectEqual("an approved entry appears in the shared library", liveIds.includes(mine), true);
+  expectEqual("and the other chamber's unoffered one does not", liveIds.includes(theirs), false);
+
+  // 6. Suspending the chamber takes its contribution down with it, and
+  //    restoring it brings it back — without touching a single row.
+  await prisma.firm.update({ where: { id: a.firm.id }, data: { status: "suspended" } });
+  expectEqual(
+    "a suspended chamber's contributions leave the shared library",
+    (await publicly()).map((r) => r.id).includes(mine),
+    false
+  );
+
+  await prisma.firm.update({ where: { id: a.firm.id }, data: { status: "active" } });
+  expectEqual(
+    "and come back when it is restored",
+    (await publicly()).map((r) => r.id).includes(mine),
+    true
+  );
+
+  // 7. Withdrawing verification does the same.
+  await prisma.firm.update({ where: { id: a.firm.id }, data: { verified: false } });
+  expectEqual(
+    "withdrawing verification takes them down too",
+    (await publicly()).map((r) => r.id).includes(mine),
+    false
+  );
+  await prisma.firm.update({ where: { id: a.firm.id }, data: { verified: true } });
+
+  // 8. Even approved, it is still that chamber's row. The other chamber
+  //    reads it through the public library, never through its own client.
+  expectNothing(
+    "an approved entry is still not in the other chamber's own library",
+    await b.db.judgment.findUnique({ where: { id: mine } })
+  );
+}
+
 /** Every model that holds chamber work must be scoped; this says which are not. */
 function reportCoverage(): void {
   console.log("\n  Schema coverage:");
@@ -487,6 +595,7 @@ async function main(): Promise<void> {
     await probe(b, a);
     await probeIdentities(a, b);
     await probePlatformAdmin(a, b);
+    await probeSharedLibrary(a, b);
     reportCoverage();
   } finally {
     await prisma.firm.deleteMany({ where: { id: { in: [a.firm.id, b.firm.id] } } });

@@ -41,3 +41,24 @@ export const verifySchema = Joi.object({
   verified: Joi.boolean().required(),
   note: Joi.string().trim().allow("").max(300).default(""),
 });
+
+/**
+ * Answering a submission.
+ *
+ * A rejection must say why. A chamber that is told only "no" cannot fix
+ * the entry, and will either give up contributing or send the same thing
+ * again.
+ */
+export const moderateSchema = Joi.object({
+  approve: Joi.boolean().required(),
+  note: Joi.string().trim().allow("").max(400).default(""),
+}).custom((value, helpers) => {
+  if (!value.approve && value.note.trim().length < 5) {
+    return helpers.error("any.custom", {
+      message: "Say why it is being turned down, so the chamber can put it right.",
+    });
+  }
+  return value;
+}).messages({
+  "any.custom": "Say why it is being turned down, so the chamber can put it right.",
+});

@@ -3,10 +3,13 @@ import { asyncHandler } from "../lib/async-handler.js";
 import {
   chamberById,
   listChambers,
+  pendingCount,
   platformTotals,
   recentPlatformActions,
   recordPlatformAction,
+  submissionQueue,
 } from "../lib/platform-stats.js";
+import { assertChamberMayShare, isSharedKind, type SharedKind } from "../lib/shared-library.js";
 import { prisma } from "../lib/prisma.js";
 import {
   platformActor,
@@ -18,6 +21,7 @@ import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
 import {
   chamberListSchema,
+  moderateSchema,
   suspendSchema,
   verifySchema,
   type ChamberListQuery,
@@ -60,13 +64,20 @@ platformRouter.get(
   validateQuery(chamberListSchema),
   asyncHandler(async (_req, res) => {
     const query = res.locals.query as ChamberListQuery;
-    const [totals, chambers, actions] = await Promise.all([
+    const [totals, chambers, actions, waiting] = await Promise.all([
       platformTotals(),
       listChambers(query),
       recentPlatformActions(20),
+      pendingCount(),
     ]);
 
-    res.json({ totals, ...chambers, actions, limit: query.limit, offset: query.offset });
+    res.json({
+      totals: { ...totals, pending: waiting },
+      ...chambers,
+      actions,
+      limit: query.limit,
+      offset: query.offset,
+    });
   })
 );
 
@@ -195,3 +206,137 @@ platformRouter.post(
     res.json(await chamberById(id));
   })
 );
+
+// ---------------------------------------------------------------------------
+// The shared library
+// ---------------------------------------------------------------------------
+
+/**
+ * What chambers have offered, and nobody has answered yet.
+ *
+ * The one place in the console that shows a chamber's content — and only
+ * content a chamber has deliberately asked to put in front of every other
+ * advocate. Reading it is the whole point of being asked to approve it.
+ */
+platformRouter.get(
+  "/submissions",
+  asyncHandler(async (req, res) => {
+    const state = String(req.query.state ?? "pending");
+    if (!["pending", "approved", "rejected"].includes(state)) {
+      throw new ApiError(400, "Not a state a submission can be in.");
+    }
+
+    res.json({ items: await submissionQueue(state) });
+  })
+);
+
+/**
+ * Approving an entry into the shared library, or turning it down.
+ *
+ * This is the sharpest thing in the console. An approved entry is a legal
+ * citation another advocate may carry into court on the strength of its
+ * being here, so approval is a statement that somebody read it — which is
+ * why it cannot be done in bulk and why the queue shows the citation, the
+ * court and the principle rather than only a title.
+ *
+ * Approval also requires the chamber to be verified. A chamber's own
+ * private work needs nothing from anybody; putting its work in front of
+ * advocates who cannot check who wrote it needs somebody to have confirmed
+ * the name is real.
+ */
+platformRouter.post(
+  "/submissions/:kind/:id",
+  validate(moderateSchema),
+  asyncHandler(async (req, res) => {
+    const kind = String(req.params.kind);
+    if (!isSharedKind(kind)) throw new ApiError(400, "Not a kind of library entry.");
+
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) throw new ApiError(400, "Not a valid id.");
+
+    const { approve, note } = req.body as { approve: boolean; note: string };
+
+    const entry = await findSubmission(kind, id);
+    if (!entry) throw new ApiError(404, "No such entry.");
+    if (entry.shareState !== "pending") {
+      throw new ApiError(400, "That has already been answered.");
+    }
+
+    if (approve) await assertChamberMayShare(entry.firmId);
+
+    await setShareState(kind, id, {
+      shareState: approve ? "approved" : "rejected",
+      sharedAt: approve ? new Date() : null,
+      shareNote: note,
+    });
+
+    res.json({ kind, id, shareState: approve ? "approved" : "rejected", shareNote: note });
+  })
+);
+
+/**
+ * Taking an approved entry back out of the shared library.
+ *
+ * Returns it to the chamber as a rejection rather than deleting it: it is
+ * their work, they keep it, and the note says what was wrong with it.
+ */
+platformRouter.post(
+  "/submissions/:kind/:id/withdraw",
+  validate(moderateSchema),
+  asyncHandler(async (req, res) => {
+    const kind = String(req.params.kind);
+    if (!isSharedKind(kind)) throw new ApiError(400, "Not a kind of library entry.");
+
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id < 1) throw new ApiError(400, "Not a valid id.");
+
+    const { note } = req.body as { note: string };
+
+    const entry = await findSubmission(kind, id);
+    if (!entry) throw new ApiError(404, "No such entry.");
+    if (entry.shareState !== "approved") {
+      throw new ApiError(400, "That is not in the shared library.");
+    }
+
+    await setShareState(kind, id, {
+      shareState: "rejected",
+      sharedAt: null,
+      shareNote: note,
+    });
+
+    res.json({ kind, id, shareState: "rejected", shareNote: note });
+  })
+);
+
+/**
+ * Unscoped by necessity and by design: moderating means reaching into
+ * another chamber's row, which is the one thing the platform admin may do
+ * and only for an entry that chamber offered. The `shareState` check above
+ * is what keeps it to those.
+ */
+async function findSubmission(kind: SharedKind, id: number) {
+  const select = { id: true, firmId: true, shareState: true } as const;
+  switch (kind) {
+    case "judgment":
+      return prisma.judgment.findUnique({ where: { id }, select });
+    case "research":
+      return prisma.research.findUnique({ where: { id }, select });
+    case "media":
+      return prisma.media.findUnique({ where: { id }, select });
+  }
+}
+
+async function setShareState(
+  kind: SharedKind,
+  id: number,
+  data: { shareState: string; sharedAt: Date | null; shareNote: string }
+) {
+  switch (kind) {
+    case "judgment":
+      return prisma.judgment.update({ where: { id }, data });
+    case "research":
+      return prisma.research.update({ where: { id }, data });
+    case "media":
+      return prisma.media.update({ where: { id }, data });
+  }
+}

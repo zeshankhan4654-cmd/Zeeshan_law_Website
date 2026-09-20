@@ -148,10 +148,84 @@ email address, that a chamber cannot reuse its own handle, that each
 address resolves to its own chamber, and that one chamber's portal password
 does not open the other chamber's identically-named client.
 
-Then the platform-admin cases above.
+Then the platform-admin cases above, and the shared library's gate: that
+publishing on a chamber's own site shares nothing, that offering is not
+appearing, that an unverified chamber's work cannot be approved, that an
+approved entry appears while an unoffered one does not, that suspending a
+chamber or withdrawing its verification takes its contributions down and
+restoring them brings them back, and that even an approved entry is still
+not reachable through another chamber's own client.
 
-72 checks. They all have to pass, and it cleans up after itself, so it is
+83 checks. They all have to pass, and it cleans up after itself, so it is
 safe against a development database.
+
+### The shared library
+
+The reason an advocate who already keeps a diary would download this: a
+library of judgments and research that every chamber contributes to and
+every chamber can read.
+
+It is also the sharpest thing on the platform. An entry here is a legal
+citation another advocate may carry into court on the strength of its
+being here, and a wrong one — a misremembered number, a principle stated
+too widely, a judgment since overruled — does damage a wrong telephone
+number on a website does not. So the gate is real, and it has four parts:
+
+1. **Nothing is shared by default.** A chamber's library is its own.
+   Publishing an entry on the chamber's *own* website is a different
+   decision and does not put it here — `published` and `share_state` are
+   deliberately separate columns.
+2. **Offering is deliberate, and reversible by the chamber.** An advocate
+   may withdraw their own work at any time, approved or not, without
+   asking anybody. It is their work.
+3. **Only the platform admin approves**, one entry at a time, never in
+   bulk, with the citation, the court and the principle in front of them
+   and a standing reminder to check it against the report.
+4. **Only for a verified chamber.** This is what verification is *for*. A
+   chamber's own private work needs nothing from anybody; putting a legal
+   citation in front of advocates who cannot check who wrote it needs
+   somebody to have confirmed the name is real.
+
+```
+     private  --offer-->  pending  --approve-->  approved
+        ^                    |                      |
+        |                    +-----send back----> rejected
+        +--------withdraw / take out----------------+
+```
+
+A rejection **must** say why — the API refuses one without a reason. A
+chamber told only "no" cannot put the entry right, and will either give up
+contributing or send the same thing again. The reason appears on their own
+library screen, and offering it again clears it, because it belonged to
+the version that was turned down.
+
+Offering needs `library.publish`, not `library.edit`: it puts the
+chamber's name in front of advocates who have never met them, which is the
+same kind of decision as publishing on their own website, not the same
+kind as writing a draft. What must be filled in to offer is stricter than
+what must be filled in to publish — a shared judgment needs its citation,
+its court, and a statement of what it decides, because it has to stand on
+its own in front of somebody who cannot ask who wrote it.
+
+**Approval is not permanent.** What the public actually sees is
+`APPROVED_AND_STANDING`: approved, *and* the chamber still verified, *and*
+the chamber still active. Both are re-checked at read time rather than
+swept over rows, so suspending a chamber takes its contributions down with
+it and restoring the chamber brings them back whole, with nothing written
+either way. Withdrawing verification does the same.
+
+Every entry carries **the chamber that contributed it**, on the list and
+on the page. An advocate deciding whether to rely on a note needs to know
+whose note it is, and the library now holds work from chambers a reader
+has never heard of. The public detail routes name their fields explicitly
+rather than returning whole rows: a whole row would carry `share_note`,
+which can hold a moderator's reason, and `submitted_by`, which is a member
+of another chamber's staff.
+
+The moderation queue is the one screen in the console that shows a
+chamber's content — and only content that chamber asked to put in front of
+every advocate on the platform. Reading it is the point of being asked to
+approve it.
 
 ### The public pages
 
@@ -595,6 +669,11 @@ checked against the report — and it lives in the API, so it holds whoever
 is typing and whatever screen they are using. A draft may be as incomplete
 as you like; a published entry may not. A recording likewise needs a link
 before it can go up.
+
+Offering an entry to the **shared library** is stricter again, for a
+reason spelled out there: a judgment then also needs its court and a
+statement of what it decides, because it has to stand on its own in front
+of an advocate who cannot ask who wrote it.
 
 **Publishing is a capability of its own.** `library.edit` writes a draft;
 `library.publish` puts it on the firm's public website under the firm's

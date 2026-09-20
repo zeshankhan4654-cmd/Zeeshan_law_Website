@@ -1,11 +1,12 @@
 "use client";
 
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Globe2, Hourglass, Plus, Trash2, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   useDeleteLibraryEntry,
   useSaveLibraryEntry,
+  useShareEntry,
   type LibraryKind,
 } from "@/lib/use-office-diary";
 
@@ -33,6 +34,18 @@ export type Entry = Record<string, unknown> & {
   title: string;
   published: boolean;
   subtitle: string;
+  /**
+   * How far this has got towards the shared library: "private" |
+   * "pending" | "approved" | "rejected".
+   *
+   * A different axis from `published`. `published` is this chamber's own
+   * decision about its own website; this is a request to put the entry in
+   * front of every advocate on the platform, which only the platform can
+   * complete.
+   */
+  shareState: string;
+  /** The moderator's reason, when there is one. */
+  shareNote: string;
 };
 
 function Form({
@@ -139,6 +152,39 @@ function Form({
   );
 }
 
+/** The shared library's state, said plainly, with what to do next. */
+function ShareBadge({ state }: { state: string }) {
+  const look: Record<string, { icon: typeof Globe2; text: string; className: string }> = {
+    approved: {
+      icon: Globe2,
+      text: "in the shared library",
+      className: "bg-gold-wash text-gold",
+    },
+    pending: {
+      icon: Hourglass,
+      text: "offered, waiting to be read",
+      className: "bg-rule/60 text-ink-soft",
+    },
+    rejected: {
+      icon: Undo2,
+      text: "sent back",
+      className: "bg-danger-wash text-danger",
+    },
+  };
+
+  const shown = look[state];
+  if (!shown) return null;
+
+  return (
+    <span
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${shown.className}`}
+    >
+      <shown.icon className="size-3.5" />
+      {shown.text}
+    </span>
+  );
+}
+
 export function LibraryEditor({
   kind,
   fields,
@@ -159,8 +205,10 @@ export function LibraryEditor({
   emptyNote: string;
 }) {
   const remove = useDeleteLibraryEntry(kind);
+  const share = useShareEntry(kind);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
+  const [shareError, setShareError] = useState("");
 
   return (
     <div className="space-y-4">
@@ -172,6 +220,12 @@ export function LibraryEditor({
             <Plus className="size-4" /> {addLabel}
           </Button>
         ))}
+
+      {shareError && (
+        <p role="alert" className="rounded-md bg-danger-wash px-3 py-2 text-sm text-danger">
+          {shareError}
+        </p>
+      )}
 
       {entries.length === 0 ? (
         <p className="rounded-card border border-rule bg-surface px-6 py-12 text-center text-sm leading-6 text-ink-soft">
@@ -200,6 +254,11 @@ export function LibraryEditor({
                 <span className="min-w-56 flex-1">
                   <span className="block font-medium text-ink">{e.title}</span>
                   <span className="block text-xs text-ink-soft">{e.subtitle}</span>
+                  {e.shareState === "rejected" && e.shareNote && (
+                    <span className="mt-1 block text-xs text-danger">
+                      Sent back: {e.shareNote}
+                    </span>
+                  )}
                 </span>
 
                 <span
@@ -210,6 +269,36 @@ export function LibraryEditor({
                   {e.published ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
                   {e.published ? "on the website" : "draft"}
                 </span>
+
+                <ShareBadge state={e.shareState} />
+
+                {canPublish && (
+                  <button
+                    type="button"
+                    disabled={share.isPending || e.shareState === "pending"}
+                    onClick={() => {
+                      setShareError("");
+                      share.mutate(
+                        { id: e.id, share: e.shareState === "private" || e.shareState === "rejected" },
+                        {
+                          onError: (err) =>
+                            setShareError(
+                              err instanceof Error ? err.message : "That did not save."
+                            ),
+                        }
+                      );
+                    }}
+                    className="text-xs font-semibold text-gold hover:underline disabled:opacity-50 disabled:hover:no-underline"
+                  >
+                    {e.shareState === "approved"
+                      ? "Withdraw from the shared library"
+                      : e.shareState === "pending"
+                        ? "Waiting"
+                        : e.shareState === "rejected"
+                          ? "Offer it again"
+                          : "Offer to the shared library"}
+                  </button>
+                )}
 
                 {canEdit && (
                   <button
