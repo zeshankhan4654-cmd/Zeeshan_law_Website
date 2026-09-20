@@ -7,6 +7,22 @@
 const profile = process.env.EAS_BUILD_PROFILE;
 const isProduction = profile === "production";
 
+/**
+ * The domain the advocates' client links live on.
+ *
+ * An advocate sends a client `https://<site>/client/login/<chamber>`. The
+ * declarations below ask Android and iOS to hand that path to the app
+ * instead of the browser, so the client lands on the sign-in screen with
+ * their chamber already filled in.
+ *
+ * Both platforms only honour this once the site serves a file proving it
+ * agrees — `/.well-known/assetlinks.json` on Android and
+ * `/.well-known/apple-app-site-association` on iOS, each naming this
+ * application. Until those exist the link simply opens in the browser,
+ * which still works; nothing breaks, the client just gets the web page.
+ */
+const SITE_HOST = process.env.EXPO_PUBLIC_SITE_HOST || "arbitratorandlaw.com";
+
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
   name: "The Arbitrator & Law Associates",
@@ -25,6 +41,7 @@ module.exports = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.arbitratorandlaw.app",
+    associatedDomains: [`applinks:${SITE_HOST}`],
   },
   android: {
     package: "com.arbitratorandlaw.app",
@@ -42,6 +59,14 @@ module.exports = {
      * forgets — production must reach the API over HTTPS.
      */
     usesCleartextTraffic: !isProduction,
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [{ scheme: "https", host: SITE_HOST, pathPrefix: "/client/login/" }],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
   },
   web: {
     bundler: "metro",

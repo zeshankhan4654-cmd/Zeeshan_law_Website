@@ -1,6 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "./api";
 
+/**
+ * The chamber that contributed an entry.
+ *
+ * The library is shared across every chamber on the platform now, so an
+ * advocate reading a note here may never have heard of whoever wrote it —
+ * and whose note it is, is part of deciding whether to rely on it.
+ */
+export type Contributor = { name: string; slug: string; verified: boolean };
+
 export type ResearchSummary = {
   id: number;
   title: string;
@@ -8,6 +17,7 @@ export type ResearchSummary = {
   summary: string;
   tags: string;
   createdAt: string;
+  firm: Contributor;
 };
 
 export type ResearchArticle = ResearchSummary & {
@@ -22,6 +32,7 @@ export type JudgmentSummary = {
   judgmentDate: string | null;
   principle: string;
   tags: string;
+  firm: Contributor;
 };
 
 export type LibraryCounts = {

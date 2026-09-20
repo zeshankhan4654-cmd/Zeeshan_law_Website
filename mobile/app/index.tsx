@@ -1,5 +1,6 @@
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import { BookOpen, Gavel, LogIn, Scale, UserCircle, Video } from "lucide-react-native";
+import { BookOpen, Building2, Gavel, LogIn, Scale, UserCircle, Video } from "lucide-react-native";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useLibraryCounts } from "@/lib/library";
 import { useSession } from "@/lib/session";
@@ -41,6 +42,16 @@ function Tile({
   );
 }
 
+/**
+ * The app's name, from app.config.js rather than written in here.
+ *
+ * It is still the first chamber's name, which is wrong for an app every
+ * advocate downloads — but naming the product is not a decision to make in
+ * a component. Reading it from the config means renaming it is one line in
+ * one file and every screen follows.
+ */
+const APP_NAME = Constants.expoConfig?.name ?? "Chambers";
+
 export default function Home() {
   const router = useRouter();
   const { data: counts } = useLibraryCounts();
@@ -52,36 +63,35 @@ export default function Home() {
         <View className="size-16 items-center justify-center rounded-card bg-gold-wash">
           <Scale size={32} color="#9a7622" strokeWidth={1.5} />
         </View>
-        <Text className="text-center text-xl font-semibold text-ink">
-          The Arbitrator &amp; Law Associates
-        </Text>
-        <Text className="text-center text-sm text-ink-soft">
-          Advocates, Arbitrators &amp; Legal Consultants · Peshawar High Court
+        <Text className="text-center text-xl font-semibold text-ink">{APP_NAME}</Text>
+        <Text className="text-center text-sm leading-5 text-ink-soft">
+          A chamber in your pocket — your diary, your clients&rsquo; files, and a
+          library every advocate contributes to.
         </Text>
       </View>
 
       <View className="gap-2">
         <Text className="text-xs font-semibold uppercase tracking-[2px] text-gold">
-          The library — open to all
+          The shared library — open to all
         </Text>
         <Tile
           icon={<BookOpen size={20} color="#9a7622" />}
           title="Legal research"
-          subtitle="Articles on limitation, arbitration, bail and more"
+          subtitle="Contributed by chambers across the country"
           count={counts?.research}
           onPress={() => router.push("/library")}
         />
         <Tile
           icon={<Gavel size={20} color="#9a7622" />}
           title="Judgments"
-          subtitle="Reported decisions of the superior courts"
+          subtitle="Reported decisions, each checked before it appears"
           count={counts?.judgments}
           onPress={() => router.push("/library/judgments")}
         />
         <Tile
           icon={<Video size={20} color="#9a7622" />}
           title="Videos &amp; lectures"
-          subtitle="Recorded material from the chamber"
+          subtitle="Recorded material from contributing chambers"
           count={counts?.media}
           disabled
         />
@@ -89,7 +99,7 @@ export default function Home() {
 
       <View className="gap-2">
         <Text className="text-xs font-semibold uppercase tracking-[2px] text-gold">
-          Clients &amp; chamber
+          Your chamber
         </Text>
         {session.status === "signed-in" ? (
           <Tile
@@ -98,25 +108,36 @@ export default function Home() {
             subtitle={
               session.account.kind === "client"
                 ? session.account.name
-                : `${session.account.fullName} · chamber staff`
+                : `${session.account.fullName} · ${session.account.chamber?.name ?? "chamber staff"}`
             }
             onPress={() => router.push("/account")}
           />
         ) : (
-          <Tile
-            icon={<LogIn size={20} color="#9a7622" />}
-            title="Sign in"
-            subtitle="Clients of the firm and chamber staff"
-            // Nothing to press while the saved sign-in is still being read.
-            disabled={session.status === "loading"}
-            onPress={() => router.push("/sign-in")}
-          />
+          <>
+            <Tile
+              icon={<LogIn size={20} color="#9a7622" />}
+              title="Sign in"
+              subtitle="Advocates, their staff, and their clients"
+              // Nothing to press while the saved sign-in is still being read.
+              disabled={session.status === "loading"}
+              onPress={() => router.push("/sign-in")}
+            />
+            {/* The reason an advocate who found this in the store would
+                keep it: they can have their own chamber in a minute. */}
+            <Tile
+              icon={<Building2 size={20} color="#9a7622" />}
+              title="Register your chamber"
+              subtitle="Your own diary, clients and files — private to you"
+              disabled={session.status === "loading"}
+              onPress={() => router.push("/sign-up")}
+            />
+          </>
         )}
       </View>
 
       <Text className="px-2 text-center text-xs leading-5 text-ink-soft">
-        Material in this library is general information, not legal advice on
-        your matter.
+        Material in the shared library is general information, not legal advice on
+        your matter, and each entry names the chamber that contributed it.
       </Text>
     </ScrollView>
   );

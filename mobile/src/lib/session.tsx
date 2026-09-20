@@ -14,18 +14,46 @@ import { deleteSecure, readSecure, writeSecure } from "./secure-store";
  */
 export type Audience = "client" | "staff";
 
+/** The chamber a staff session belongs to. */
+export type Chamber = {
+  slug: string;
+  name: string;
+  verified: boolean;
+  /** The path this chamber's clients sign in at. */
+  clientLoginPath: string;
+};
+
 export type Account =
   | { kind: "client"; id: number; name: string; username: string; showFees: boolean; mustChangePassword: boolean }
   | {
       kind: "staff";
       id: number;
-      fullName: string;
+      /** What they sign in with. */
+      email: string;
+      /** Their handle inside the chamber — what signs a case update. */
       username: string;
+      fullName: string;
       role: string;
       mustChangePassword: boolean;
+      /** True while the address is a placeholder that cannot receive mail. */
+      emailIsPlaceholder: boolean;
       /** null means the Principal, who holds every capability. */
       capabilities: string[] | null;
+      chamber: Chamber | null;
     };
+
+/**
+ * What each audience signs in with.
+ *
+ * They differ because the people differ. An advocate has an email address
+ * and it is unique across the platform, so no chamber need be named. A
+ * client may well have no email at all — an elderly litigant very often
+ * does not — so they keep a username, unique within their advocate's
+ * chamber, and name the chamber from the link they were sent.
+ */
+export type Credentials =
+  | { kind: "staff"; email: string; password: string }
+  | { kind: "client"; firm: string; username: string; password: string };
 
 type Stored = { kind: Audience; token: string };
 
@@ -37,7 +65,12 @@ type SessionState =
   | { status: "signed-in"; account: Account; token: string };
 
 type SessionValue = SessionState & {
-  signIn: (audience: Audience, username: string, password: string) => Promise<Account>;
+  signIn: (credentials: Credentials) => Promise<Account>;
+  /**
+   * Adopts a token the API has just issued, without asking for the
+   * password again. Used by registration, which is handed one.
+   */
+  signInWithToken: (audience: Audience, token: string) => Promise<Account>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -50,11 +83,14 @@ const ROUTES: Record<Audience, string> = { client: "/api/portal", staff: "/api/a
 type ClientMe = { id: number; name: string; username: string; showFees: boolean; mustChangePassword: boolean };
 type StaffMe = {
   id: number;
+  email: string;
   fullName: string;
   username: string;
   role: string;
   mustChangePassword: boolean;
+  emailIsPlaceholder: boolean;
   capabilities: string[] | null;
+  chamber: Chamber | null;
 };
 type Me = ClientMe | StaffMe;
 
@@ -69,11 +105,14 @@ function toAccount(kind: Audience, data: Me): Account {
   return {
     kind,
     id: s.id,
+    email: s.email,
     fullName: s.fullName,
     username: s.username,
     role: s.role,
     mustChangePassword: s.mustChangePassword,
+    emailIsPlaceholder: s.emailIsPlaceholder ?? false,
     capabilities: s.capabilities ?? null,
+    chamber: s.chamber ?? null,
   };
 }
 
@@ -133,10 +172,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [load, clear]);
 
   const signIn = useCallback(
-    async (audience: Audience, username: string, password: string) => {
+    async (credentials: Credentials) => {
+      const audience = credentials.kind;
+      // The kind is how the app decides which endpoint to call; it is not
+      // something the API is told, so it is dropped from the body.
+      const { kind: _kind, ...body } = credentials;
+
       const data = await apiFetch<Me & { token: string }>(`${ROUTES[audience]}/login`, {
         method: "POST",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(body),
       });
       const stored: Stored = { kind: audience, token: data.token };
       await writeSecure(TOKEN_KEY, JSON.stringify(stored));
@@ -151,6 +195,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     },
     []
   );
+
+  const signInWithToken = useCallback(async (audience: Audience, token: string) => {
+    const me = await apiFetch<Me>(`${ROUTES[audience]}/me`, { token });
+    await writeSecure(TOKEN_KEY, JSON.stringify({ kind: audience, token } satisfies Stored));
+
+    const account = toAccount(audience, me);
+    setState({ status: "signed-in", account, token });
+
+    // Not awaited, as in signIn: notifications are a convenience and must
+    // never hold up what somebody is waiting on.
+    void registerDevice(audience, token);
+
+    return account;
+  }, []);
 
   const signOut = useCallback(async () => {
     const audience = state.status === "signed-in" ? state.account.kind : null;
@@ -174,8 +232,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [state, load]);
 
   const value = useMemo<SessionValue>(
-    () => ({ ...state, signIn, signOut, refresh }),
-    [state, signIn, signOut, refresh]
+    () => ({ ...state, signIn, signInWithToken, signOut, refresh }),
+    [state, signIn, signInWithToken, signOut, refresh]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

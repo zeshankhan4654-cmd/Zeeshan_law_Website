@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useChamberLink } from "@/lib/chamber-link";
 import { useNotificationRouting } from "@/lib/notification-routing";
 import { QueryProvider } from "@/lib/query-provider";
 import { SessionProvider } from "@/lib/session";
@@ -9,6 +10,7 @@ import "../global.css";
 /** Inside the providers, because routing a tapped notification needs the session. */
 function AppStack() {
   useNotificationRouting();
+  useChamberLink();
 
   return (
     <>
@@ -26,6 +28,7 @@ function AppStack() {
         <Stack.Screen name="library/judgments" options={{ title: "Judgments" }} />
         <Stack.Screen name="library/[id]" options={{ title: "", headerBackTitle: "Library" }} />
         <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
+        <Stack.Screen name="sign-up" options={{ title: "Register your chamber" }} />
         <Stack.Screen name="account" options={{ title: "Your account" }} />
         <Stack.Screen name="change-password" options={{ title: "Password" }} />
         {/* Each tier carries its own header, from its own gated layout. */}

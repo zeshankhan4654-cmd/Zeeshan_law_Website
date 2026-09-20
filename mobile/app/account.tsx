@@ -84,9 +84,16 @@ export default function AccountScreen() {
           )}
         </View>
         <Text className="text-center text-lg font-semibold text-ink">{displayName}</Text>
+        {/* The chamber, named. Every advocate has their own here, and a
+            screen that says only "Chamber staff" would not tell somebody
+            with an account in two places which one they are in. */}
         <Text className="text-center text-sm text-ink-soft">
-          {isClient ? "Client of the firm" : `Chamber staff · ${account.role}`} ·{" "}
-          {account.username}
+          {isClient
+            ? "Client of the chamber"
+            : `${account.chamber?.name ?? "Your chamber"} · ${account.role}`}
+        </Text>
+        <Text className="text-center text-xs text-ink-soft">
+          {isClient ? account.username : account.email}
         </Text>
       </View>
 
@@ -101,6 +108,31 @@ export default function AccountScreen() {
             choose your own.
           </Text>
         </Pressable>
+      )}
+
+      {!isClient && account.emailIsPlaceholder && (
+        <View className="gap-1 rounded-card bg-gold-wash px-4 py-3.5">
+          <Text className="text-sm leading-5 text-ink">
+            You sign in with {account.email}, which was written for you and cannot
+            receive mail.
+          </Text>
+          <Text className="text-xs leading-5 text-ink-soft">
+            Put your real address in from the office website, so a password can be
+            recovered later.
+          </Text>
+        </View>
+      )}
+
+      {!isClient && account.chamber && !account.chamber.verified && (
+        <View className="gap-1 rounded-card border border-rule bg-surface px-4 py-3.5">
+          <Text className="text-sm font-semibold text-ink">
+            {account.chamber.name} is not verified yet
+          </Text>
+          <Text className="text-xs leading-5 text-ink-soft">
+            That restricts nothing you do inside your chamber. It matters only for
+            work you offer to the shared library, which every advocate can read.
+          </Text>
+        </View>
       )}
 
       {isClient ? (

@@ -1037,6 +1037,46 @@ configurable so a test can point the real code path at a local stub.
 Notifications are an iOS and Android feature. The web target has no
 notification API and is guarded out of every call.
 
+#### Signing in on the phone
+
+The app carries all three audiences, and each signs in with what suits it.
+
+An **advocate or member of staff** signs in with their email address, the
+same as on the website. An **advocate with no chamber yet** registers one
+from the phone — the one place in the app where somebody creates their own
+account, and the reason an advocate who finds this in a store would keep
+it: download, register, and the diary is there the same afternoon. The
+screen afterwards gives them the link for their clients and a share sheet
+to send it, because what an advocate actually does with that link is put it
+into WhatsApp.
+
+A **client** signs in with their username *and their chamber*. The chamber
+comes from the link their advocate sent them, and the app claims that path:
+tapping `https://<site>/client/login/<chamber>` on a phone with the app
+installed opens the sign-in screen with the chamber already filled in
+rather than the browser. `arbitratorlaw://client/<chamber>` does the same,
+which is what a QR code in a waiting room would carry. Typed by hand
+otherwise — the field says it is the last part of the link.
+
+Both platforms only honour the web link once the site serves a file saying
+it agrees: `/.well-known/assetlinks.json` on Android and
+`/.well-known/apple-app-site-association` on iOS, each naming the
+application. **Neither is hosted yet.** Until they are, the link opens in
+the browser, which still works — the client gets the web page instead of
+the app, and nothing breaks.
+
+Each account screen names its own chamber, warns an advocate whose address
+is still a `.invalid` placeholder, and says plainly when a chamber is not
+yet verified and what that does and does not restrict.
+
+#### The app's name
+
+`app.config.js` still calls it *The Arbitrator & Law Associates*, which is
+wrong for an app every advocate downloads — and naming the product is not
+a decision to make in a component. Every screen reads it from that one
+config field (`Constants.expoConfig.name`), so renaming it is one line in
+one file and the whole app follows.
+
 #### How the phone holds a session
 
 React Native has no cookie jar, so the app keeps its token in the platform

@@ -50,7 +50,7 @@ export default function JudgmentsList() {
               <Text className="text-center text-sm leading-5 text-ink-soft">
                 {q
                   ? `The library holds nothing matching “${q}”.`
-                  : "Judgments are added as the chamber publishes them, each checked against the law report before it appears here."}
+                  : "Chambers across the platform contribute judgments, and each is checked against the law report before it appears here."}
               </Text>
             </View>
           }
@@ -62,6 +62,9 @@ export default function JudgmentsList() {
               {item.principle ? (
                 <Text className="mt-1 text-sm leading-5 text-ink-soft">{item.principle}</Text>
               ) : null}
+              <Text className="pt-1 text-xs text-ink-soft">
+                Contributed by {item.firm.name}
+              </Text>
             </View>
           )}
         />

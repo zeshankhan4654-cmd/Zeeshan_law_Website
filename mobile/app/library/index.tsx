@@ -75,6 +75,9 @@ export default function ResearchList() {
                   {item.summary}
                 </Text>
               ) : null}
+              {/* Whose note it is. Chambers across the platform contribute
+                  here, so a reader may never have heard of the author. */}
+              <Text className="pt-1 text-xs text-ink-soft">{item.firm.name}</Text>
             </Pressable>
           )}
         />
