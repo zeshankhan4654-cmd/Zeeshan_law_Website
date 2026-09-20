@@ -17,12 +17,16 @@ export type StaffSession = {
   sub: number; // users.id
   username: string;
   role: string;
+  /** The chamber this session may see. Nothing outside it is reachable. */
+  firm: number;
 };
 
 export type ClientSession = {
   kind: "client";
   sub: number; // clients.id
   username: string;
+  /** The chamber whose client this is. */
+  firm: number;
 };
 
 export type SessionPayload = StaffSession | ClientSession;
@@ -38,16 +42,24 @@ export function verifySession(token: string): SessionPayload {
   const decoded = jwt.verify(token, env.jwt.secret) as JwtPayload;
   const sub = Number(decoded.sub);
   const username = decoded.username;
+  const firm = Number(decoded.firm);
 
   if (!Number.isInteger(sub) || sub <= 0 || typeof username !== "string") {
     throw new Error("Malformed session payload");
   }
 
+  // A session with no chamber is not a session. Tokens issued before the
+  // platform existed have none, and are refused rather than guessed at —
+  // guessing would put somebody in whichever chamber happened to be first.
+  if (!Number.isInteger(firm) || firm <= 0) {
+    throw new Error("Session names no chamber");
+  }
+
   if (decoded.kind === "staff" && typeof decoded.role === "string") {
-    return { kind: "staff", sub, username, role: decoded.role };
+    return { kind: "staff", sub, username, role: decoded.role, firm };
   }
   if (decoded.kind === "client") {
-    return { kind: "client", sub, username };
+    return { kind: "client", sub, username, firm };
   }
 
   // Includes tokens issued before `kind` existed. Failing closed costs one

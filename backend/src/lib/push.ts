@@ -47,18 +47,22 @@ const CHUNK = 100;
 
 /** Registers a device to the party that is signed in on it. */
 export async function registerDevice(
+  firmId: number,
   kind: Audience,
   subjectId: number,
   token: string,
   platform: string
 ): Promise<void> {
-  // The token is unique across the table. A handset signing in as somebody
-  // else is *reassigned*, which is what stops the previous holder's
-  // notifications following the phone to its new owner.
+  // The token is unique across the whole table, not per chamber, and that
+  // is on purpose: one handset is one device wherever its owner practises.
+  // A phone signing in as somebody else — including somebody in another
+  // chamber — is *reassigned*, which is what stops the previous holder's
+  // notifications following the phone to its new owner. The upsert
+  // therefore runs unscoped; the row it writes still names its chamber.
   await prisma.pushToken.upsert({
     where: { token },
-    create: { token, kind, subjectId, platform },
-    update: { kind, subjectId, platform },
+    create: { token, kind, subjectId, platform, firmId },
+    update: { kind, subjectId, platform, firmId },
   });
 }
 
@@ -67,11 +71,15 @@ export async function forgetDevice(token: string): Promise<void> {
   await prisma.pushToken.deleteMany({ where: { token } });
 }
 
-/** Every device currently registered to these parties. */
-async function tokensFor(kind: Audience, subjectIds: number[]): Promise<string[]> {
+/** Every device currently registered to these parties, in this chamber. */
+async function tokensFor(
+  firmId: number,
+  kind: Audience,
+  subjectIds: number[]
+): Promise<string[]> {
   if (subjectIds.length === 0) return [];
   const rows = await prisma.pushToken.findMany({
-    where: { kind, subjectId: { in: subjectIds } },
+    where: { firmId, kind, subjectId: { in: subjectIds } },
     select: { token: true },
   });
   return rows.map((r) => r.token);
@@ -133,6 +141,7 @@ async function deliver(messages: ExpoPush[]): Promise<string[]> {
  * many devices were addressed, which is what the reminder job reports.
  */
 export async function notify(
+  firmId: number,
   kind: Audience,
   subjectIds: number[],
   message: PushMessage
@@ -140,7 +149,7 @@ export async function notify(
   try {
     if (env.push.transport === "off") return 0;
 
-    const tokens = await tokensFor(kind, subjectIds);
+    const tokens = await tokensFor(firmId, kind, subjectIds);
     if (tokens.length === 0) return 0;
 
     if (env.push.transport === "log") {
@@ -163,14 +172,17 @@ export async function notify(
   }
 }
 
-/** The staff who should hear about a client's question. */
-export async function staffWithCapability(cap: string): Promise<number[]> {
-  const grants = await prisma.roleCap.findMany({ where: { cap }, select: { roleKey: true } });
+/** The staff of one chamber who should hear about a client's question. */
+export async function staffWithCapability(firmId: number, cap: string): Promise<number[]> {
+  const grants = await prisma.roleCap.findMany({
+    where: { firmId, cap },
+    select: { roleKey: true },
+  });
   const roles = grants.map((g) => g.roleKey);
 
   const users = await prisma.user.findMany({
     // The Principal always holds every capability, whatever role_caps says.
-    where: { OR: [{ role: ROOT_ROLE }, { role: { in: roles } }] },
+    where: { firmId, OR: [{ role: ROOT_ROLE }, { role: { in: roles } }] },
     select: { id: true },
   });
   return users.map((u) => u.id);

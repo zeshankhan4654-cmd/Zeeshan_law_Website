@@ -1,6 +1,11 @@
-// The chambers system's data model — 21 tables carried over from the
-// original design, translated to Postgres. camelCase in code, snake_case in
-// the database (via @map/@@map), so both SQL and TypeScript read naturally.
+// The platform's data model. camelCase in code, snake_case in the database
+// (via @map/@@map), so both SQL and TypeScript read naturally.
+//
+// Every table that holds a chamber's work carries `firmId`. It is
+// denormalised deliberately — a hearing could be reached through its case,
+// but a key on the row itself means every query can be scoped directly, and
+// the tenant client (src/lib/tenant.ts) can enforce that uniformly instead
+// of each call site remembering to join.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,6 +17,52 @@ datasource db {
 }
 
 // ---------------------------------------------------------------------------
+// The platform
+// ---------------------------------------------------------------------------
+
+/// A chamber: one lawyer's practice, with its own staff, clients and files.
+///
+/// Every other table below belongs to exactly one of these, and nothing in
+/// one firm is reachable from another. The platform's own chamber is simply
+/// the first row.
+model Firm {
+  id              Int      @id @default(autoincrement())
+  /// Used in URLs and invitations, e.g. "arbitrator-law".
+  slug            String   @unique
+  name            String
+  /// "active" | "suspended" — a suspended chamber cannot sign in at all.
+  status          String   @default("active")
+  /// Set when the platform admin suspends it, for the message shown.
+  suspendedReason String   @default("") @map("suspended_reason")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  users          User[]
+  roles          Role[]
+  roleCaps       RoleCap[]
+  clients        Client[]
+  cases          Case[]
+  hearings       Hearing[]
+  caseUpdates    CaseUpdate[]
+  caseMessages   CaseMessage[]
+  documents      Document[]
+  fees           Fee[]
+  officialFees   OfficialFee[]
+  expenses       Expense[]
+  communications Communication[]
+  judgments      Judgment[]
+  research       Research[]
+  media          Media[]
+  enquiries      Enquiry[]
+  settings       Setting[]
+  testimonials   Testimonial[]
+  posts          Post[]
+  pushTokens     PushToken[]
+
+  @@map("firms")
+}
+
+// ---------------------------------------------------------------------------
 // Accounts, roles and access
 // ---------------------------------------------------------------------------
 
@@ -19,14 +70,21 @@ datasource db {
 /// capability regardless of what role_caps says — enforced in application
 /// code, not here, so a future capability is automatically covered.
 model User {
-  id                Int      @id @default(autoincrement())
-  username          String   @unique
-  passwordHash      String   @map("password_hash")
-  fullName          String   @map("full_name")
-  role              String
-  mustChangePassword Boolean @default(false) @map("must_change_password")
-  createdAt         DateTime @default(now()) @map("created_at")
+  id                 Int      @id @default(autoincrement())
+  username           String   @unique
+  passwordHash       String   @map("password_hash")
+  fullName           String   @map("full_name")
+  role               String
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  createdAt          DateTime @default(now()) @map("created_at")
 
+  // `username` stays unique across the whole platform for now, so signing
+  // in needs no firm chosen first. M2 moves sign-in to an email address and
+  // frees the handle to be per-chamber.
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("users")
 }
 
@@ -35,13 +93,18 @@ model User {
 /// role_key not in that starting set is just as valid.
 model Role {
   id          Int      @id @default(autoincrement())
-  roleKey     String   @unique @map("role_key")
+  roleKey     String   @map("role_key")
   label       String
   description String   @default("")
   isSystem    Boolean  @default(false) @map("is_system")
   sortOrder   Int      @default(50) @map("sort_order")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  // Each chamber names its own roles; two firms may both have a "Clerk".
+  @@unique([firmId, roleKey])
   @@map("roles")
 }
 
@@ -53,7 +116,10 @@ model RoleCap {
   roleKey String @map("role_key")
   cap     String
 
-  @@id([roleKey, cap])
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@id([firmId, roleKey, cap])
   @@map("role_caps")
 }
 
@@ -71,7 +137,10 @@ model PushToken {
   createdAt  DateTime @default(now()) @map("created_at")
   lastSeenAt DateTime @updatedAt @map("last_seen_at")
 
-  @@index([kind, subjectId])
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId, kind, subjectId])
   @@map("push_tokens")
 }
 
@@ -81,6 +150,9 @@ model PushToken {
 /// login for the same name are counted independently — and the public
 /// enquiry form, the one unauthenticated write on the site. The shape suits
 /// both, so they share a table rather than a near-duplicate one.
+/// Deliberately *not* scoped to a chamber. A brute-forcer working through
+/// usernames is one attacker whichever chamber they are guessing at, and the
+/// throttle runs before a sign-in has told us which chamber that would be.
 model RateLimit {
   id          Int       @id @default(autoincrement())
   scope       String
@@ -99,25 +171,29 @@ model RateLimit {
 // ---------------------------------------------------------------------------
 
 model Client {
-  id              Int      @id @default(autoincrement())
-  name            String
-  phone           String   @default("")
-  email           String   @default("")
-  address         String   @default("")
-  portalEnabled   Boolean  @default(false) @map("portal_enabled")
-  portalUsername  String?  @unique @map("portal_username")
-  portalHash      String?  @map("portal_hash")
+  id                       Int      @id @default(autoincrement())
+  name                     String
+  phone                    String   @default("")
+  email                    String   @default("")
+  address                  String   @default("")
+  portalEnabled            Boolean  @default(false) @map("portal_enabled")
+  portalUsername           String?  @unique @map("portal_username")
+  portalHash               String?  @map("portal_hash")
   /// Set when the office issues or resets a portal password; the portal
   /// refuses every other route until the client has chosen their own.
-  portalMustChangePassword Boolean @default(false) @map("portal_must_change_password")
-  portalShowFees  Boolean  @default(false) @map("portal_show_fees")
-  notes           String   @default("")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  portalMustChangePassword Boolean  @default(false) @map("portal_must_change_password")
+  portalShowFees           Boolean  @default(false) @map("portal_show_fees")
+  notes                    String   @default("")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
-  cases         Case[]
+  cases          Case[]
   communications Communication[]
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("clients")
 }
 
@@ -134,7 +210,7 @@ model Case {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   hearings  Hearing[]
   updates   CaseUpdate[]
   messages  CaseMessage[]
@@ -142,24 +218,32 @@ model Case {
   fees      Fee[]
   research  Research[]
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([clientId])
   @@map("cases")
 }
 
 model Hearing {
-  id          Int      @id @default(autoincrement())
-  caseId      Int      @map("case_id")
-  hearingDate DateTime @map("hearing_date") @db.Date
-  purpose     String   @default("")
+  id             Int       @id @default(autoincrement())
+  caseId         Int       @map("case_id")
+  hearingDate    DateTime  @map("hearing_date") @db.Date
+  purpose        String    @default("")
   /// Internal only — never shown to the client portal.
-  outcome     String   @default("")
+  outcome        String    @default("")
   /// When the reminder for this hearing went out, so a re-run of the
   /// reminder job never tells anyone twice.
   reminderSentAt DateTime? @map("reminder_sent_at")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([caseId])
   @@map("hearings")
 }
@@ -176,6 +260,10 @@ model CaseUpdate {
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([caseId])
   @@map("case_updates")
 }
@@ -183,36 +271,44 @@ model CaseUpdate {
 /// The message thread between a client and the office on one case, including
 /// client voice notes (storedName set when the message carries a recording).
 model CaseMessage {
-  id          Int      @id @default(autoincrement())
-  caseId      Int      @map("case_id")
-  authorType  String   @map("author_type") // "client" | "office"
-  authorName  String   @default("") @map("author_name")
-  body        String   @default("")
-  storedName  String   @default("") @map("stored_name")
-  origName    String   @default("") @map("orig_name")
-  answered    Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         Int      @id @default(autoincrement())
+  caseId     Int      @map("case_id")
+  authorType String   @map("author_type") // "client" | "office"
+  authorName String   @default("") @map("author_name")
+  body       String   @default("")
+  storedName String   @default("") @map("stored_name")
+  origName   String   @default("") @map("orig_name")
+  answered   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([caseId])
   @@map("case_messages")
 }
 
 model Document {
-  id             Int      @id @default(autoincrement())
-  caseId         Int      @map("case_id")
-  title          String
-  storedName     String   @default("") @map("stored_name")
-  origName       String   @default("") @map("orig_name")
-  sizeBytes      Int      @default(0) @map("size_bytes")
+  id            Int      @id @default(autoincrement())
+  caseId        Int      @map("case_id")
+  title         String
+  storedName    String   @default("") @map("stored_name")
+  origName      String   @default("") @map("orig_name")
+  sizeBytes     Int      @default(0) @map("size_bytes")
   /// Private by default — an office action must deliberately mark a
   /// document Shared before a client can see it.
-  clientVisible  Boolean  @default(false) @map("client_visible")
-  createdAt      DateTime @default(now()) @map("created_at")
+  clientVisible Boolean  @default(false) @map("client_visible")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([caseId])
   @@map("documents")
 }
@@ -224,7 +320,7 @@ model Document {
 model Fee {
   id        Int      @id @default(autoincrement())
   caseId    Int      @map("case_id")
-  kind      String   // "agreed" | "received"
+  kind      String // "agreed" | "received"
   amount    Decimal  @db.Decimal(12, 2)
   entryDate DateTime @map("entry_date") @db.Date
   note      String   @default("")
@@ -232,6 +328,10 @@ model Fee {
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([caseId])
   @@map("fees")
 }
@@ -245,6 +345,10 @@ model OfficialFee {
   note      String   @default("")
   createdAt DateTime @default(now()) @map("created_at")
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("official_fees")
 }
 
@@ -256,6 +360,10 @@ model Expense {
   description String   @default("")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("expenses")
 }
 
@@ -264,16 +372,20 @@ model Expense {
 // ---------------------------------------------------------------------------
 
 model Communication {
-  id            Int       @id @default(autoincrement())
-  clientId      Int?      @map("client_id")
-  method        String    // "call" | "email" | "in_person"
-  summary       String
-  commDate      DateTime  @map("comm_date") @db.Date
-  followUpDue   DateTime? @map("follow_up_due") @db.Date
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id          Int       @id @default(autoincrement())
+  clientId    Int?      @map("client_id")
+  method      String // "call" | "email" | "in_person"
+  summary     String
+  commDate    DateTime  @map("comm_date") @db.Date
+  followUpDue DateTime? @map("follow_up_due") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([clientId])
   @@map("communications")
 }
@@ -283,42 +395,52 @@ model Communication {
 // ---------------------------------------------------------------------------
 
 model Judgment {
-  id            Int       @id @default(autoincrement())
-  title         String
-  citation      String    @default("")
-  court         String    @default("")
-  judges        String    @default("")
-  judgmentDate  DateTime? @map("judgment_date") @db.Date
-  sections      String    @default("")
-  principle     String    @default("")
-  summary       String    @default("")
-  tags          String    @default("")
-  sourceUrl     String    @default("") @map("source_url")
-  storedName    String    @default("") @map("stored_name")
-  origName      String    @default("") @map("orig_name")
-  sizeBytes     Int       @default(0) @map("size_bytes")
-  published     Boolean   @default(false)
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id           Int       @id @default(autoincrement())
+  title        String
+  citation     String    @default("")
+  court        String    @default("")
+  judges       String    @default("")
+  judgmentDate DateTime? @map("judgment_date") @db.Date
+  sections     String    @default("")
+  principle    String    @default("")
+  summary      String    @default("")
+  tags         String    @default("")
+  sourceUrl    String    @default("") @map("source_url")
+  storedName   String    @default("") @map("stored_name")
+  origName     String    @default("") @map("orig_name")
+  sizeBytes    Int       @default(0) @map("size_bytes")
+  published    Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at")
 
+  /// The chamber that wrote it. Sharing it with every other chamber is a
+  /// separate act, moderated by the platform — see M4.
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("judgments")
 }
 
 model Research {
-  id          Int      @id @default(autoincrement())
-  title       String
-  topic       String   @default("")
-  summary     String   @default("")
-  body        String   @default("")
-  tags        String   @default("")
-  caseId      Int?     @map("case_id")
-  storedName  String   @default("") @map("stored_name")
-  origName    String   @default("") @map("orig_name")
-  sizeBytes   Int      @default(0) @map("size_bytes")
-  published   Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         Int      @id @default(autoincrement())
+  title      String
+  topic      String   @default("")
+  summary    String   @default("")
+  body       String   @default("")
+  tags       String   @default("")
+  caseId     Int?     @map("case_id")
+  storedName String   @default("") @map("stored_name")
+  origName   String   @default("") @map("orig_name")
+  sizeBytes  Int      @default(0) @map("size_bytes")
+  published  Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
 
   case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@index([caseId])
   @@map("research")
 }
@@ -337,6 +459,10 @@ model Media {
   published   Boolean   @default(false)
   createdAt   DateTime  @default(now()) @map("created_at")
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("media")
 }
 
@@ -354,6 +480,10 @@ model Enquiry {
   read      Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId])
   @@map("enquiries")
 }
 
@@ -362,48 +492,61 @@ model Enquiry {
 /// constant in application config, so a fresh install works before anyone
 /// has touched this table.
 model Setting {
-  key       String   @id @map("skey")
+  key       String   @map("skey")
   value     String   @default("") @map("sval")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  // Each chamber keeps its own address, telephone number and accounts.
+  @@id([firmId, key])
   @@map("settings")
 }
 
 model Testimonial {
-  id         Int      @id @default(autoincrement())
-  author     String
-  role       String   @default("")
-  body       String
-  rating     Int      @default(5)
-  source     String   @default("Google")
-  sourceUrl  String   @default("") @map("source_url")
-  published  Boolean  @default(true)
-  sortOrder  Int      @default(50) @map("sort_order")
-  createdBy  String   @default("") @map("created_by")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        Int      @id @default(autoincrement())
+  author    String
+  role      String   @default("")
+  body      String
+  rating    Int      @default(5)
+  source    String   @default("Google")
+  sourceUrl String   @default("") @map("source_url")
+  published Boolean  @default(true)
+  sortOrder Int      @default(50) @map("sort_order")
+  createdBy String   @default("") @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([published, sortOrder])
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId, published, sortOrder])
   @@map("testimonials")
 }
 
 model Post {
-  id           Int       @id @default(autoincrement())
-  slug         String    @unique
-  title        String
-  summary      String    @default("")
-  body         String    @default("")
-  category     String    @default("")
-  tags         String    @default("")
-  coverName    String    @default("") @map("cover_name")
-  coverOrig    String    @default("") @map("cover_orig")
-  author       String    @default("")
-  published    Boolean   @default(false)
-  publishedOn  DateTime? @map("published_on") @db.Date
-  views        Int       @default(0)
-  createdBy    String    @default("") @map("created_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id          Int       @id @default(autoincrement())
+  slug        String
+  title       String
+  summary     String    @default("")
+  body        String    @default("")
+  category    String    @default("")
+  tags        String    @default("")
+  coverName   String    @default("") @map("cover_name")
+  coverOrig   String    @default("") @map("cover_orig")
+  author      String    @default("")
+  published   Boolean   @default(false)
+  publishedOn DateTime? @map("published_on") @db.Date
+  views       Int       @default(0)
+  createdBy   String    @default("") @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  @@index([published, publishedOn])
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  // Two chambers may each have an article at /blog/limitation.
+  @@unique([firmId, slug])
+  @@index([firmId, published, publishedOn])
   @@map("posts")
 }

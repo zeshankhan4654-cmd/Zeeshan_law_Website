@@ -5,13 +5,13 @@ import multer from "multer";
 import { asyncHandler } from "../lib/async-handler.js";
 import { generatePassword, portalUsernameTaken, proposeUsername } from "../lib/credentials.js";
 import { hashPassword } from "../lib/password.js";
-import { prisma } from "../lib/prisma.js";
 import { generateStoredName, resolveStoredPath, uploadDirFor } from "../lib/uploads.js";
 import {
   requireCap,
   requireNoPendingPasswordChange,
   requireStaff,
   staffSession,
+  tenant,
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
@@ -62,7 +62,8 @@ officeRecordsRouter.get(
   "/clients",
   requireCap("clients.view"),
   validateQuery(clientListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { q, limit, offset } = res.locals.query as ClientListQuery;
 
     const where = q
@@ -76,7 +77,7 @@ officeRecordsRouter.get(
       : {};
 
     const [items, total] = await Promise.all([
-      prisma.client.findMany({
+      db.client.findMany({
         where,
         orderBy: { name: "asc" },
         take: limit,
@@ -87,7 +88,7 @@ officeRecordsRouter.get(
           _count: { select: { cases: true } },
         },
       }),
-      prisma.client.count({ where }),
+      db.client.count({ where }),
     ]);
 
     res.json({
@@ -109,9 +110,10 @@ officeRecordsRouter.get(
   "/clients/:id",
   requireCap("clients.view"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
 
-    const client = await prisma.client.findUnique({
+    const client = await db.client.findUnique({
       where: { id },
       select: {
         id: true, name: true, phone: true, email: true, address: true, notes: true,
@@ -134,9 +136,10 @@ officeRecordsRouter.post(
   requireCap("clients.edit"),
   validate(clientSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const data = req.body as ClientInput;
-    const client = await prisma.client.create({
-      data,
+    const client = await db.client.create({
+      data: { ...data, firmId },
       select: { id: true, name: true },
     });
     res.status(201).json(client);
@@ -148,11 +151,12 @@ officeRecordsRouter.patch(
   requireCap("clients.edit"),
   validate(clientSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const exists = await prisma.client.findUnique({ where: { id }, select: { id: true } });
+    const exists = await db.client.findUnique({ where: { id }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such client.");
 
-    await prisma.client.update({ where: { id }, data: req.body as ClientInput });
+    await db.client.update({ where: { id }, data: req.body as ClientInput });
     res.status(204).end();
   })
 );
@@ -170,14 +174,15 @@ officeRecordsRouter.post(
   requireCap("clients.portal"),
   validate(portalAccessSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
     const { enabled, showFees, resetPassword } = req.body as PortalAccessInput;
 
-    const client = await prisma.client.findUnique({ where: { id } });
+    const client = await db.client.findUnique({ where: { id } });
     if (!client) throw new ApiError(404, "No such client.");
 
     if (!enabled) {
-      await prisma.client.update({
+      await db.client.update({
         where: { id },
         data: { portalEnabled: false, portalShowFees: showFees },
       });
@@ -190,7 +195,7 @@ officeRecordsRouter.post(
       client.portalUsername ?? (await proposeUsername(client.name, portalUsernameTaken));
     const password = needsPassword ? generatePassword() : null;
 
-    await prisma.client.update({
+    await db.client.update({
       where: { id },
       data: {
         portalEnabled: true,
@@ -217,16 +222,17 @@ officeRecordsRouter.post(
   requireCap("cases.edit"),
   validate(caseSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const data = req.body as CaseInput;
 
-    const client = await prisma.client.findUnique({
+    const client = await db.client.findUnique({
       where: { id: data.clientId },
       select: { id: true },
     });
     if (!client) throw new ApiError(400, "That client does not exist.");
 
-    const created = await prisma.case.create({
-      data: { ...data, nextHearing: data.nextHearing || null },
+    const created = await db.case.create({
+      data: { ...data, firmId, nextHearing: data.nextHearing || null },
       select: { id: true, title: true },
     });
     res.status(201).json(created);
@@ -238,12 +244,13 @@ officeRecordsRouter.patch(
   requireCap("cases.edit"),
   validate(caseEditSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const exists = await prisma.case.findUnique({ where: { id }, select: { id: true } });
+    const exists = await db.case.findUnique({ where: { id }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such case.");
 
     const data = req.body as Omit<CaseInput, "clientId">;
-    await prisma.case.update({
+    await db.case.update({
       where: { id },
       data: { ...data, nextHearing: data.nextHearing || null },
     });
@@ -260,17 +267,18 @@ officeRecordsRouter.post(
   requireCap("hearings.edit"),
   validate(hearingSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     const { hearingDate, purpose, setAsNext } = req.body as HearingInput;
 
-    const matter = await prisma.case.findUnique({
+    const matter = await db.case.findUnique({
       where: { id: caseId },
       select: { id: true, nextHearing: true },
     });
     if (!matter) throw new ApiError(404, "No such case.");
 
-    const created = await prisma.hearing.create({
-      data: { caseId, hearingDate, purpose },
+    const created = await db.hearing.create({
+      data: { firmId, caseId, hearingDate, purpose },
       select: { id: true, hearingDate: true, purpose: true, outcome: true },
     });
 
@@ -279,7 +287,7 @@ officeRecordsRouter.post(
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
     if (setAsNext && hearingDate >= today) {
-      await prisma.case.update({ where: { id: caseId }, data: { nextHearing: hearingDate } });
+      await db.case.update({ where: { id: caseId }, data: { nextHearing: hearingDate } });
     }
 
     res.status(201).json(created);
@@ -295,14 +303,15 @@ officeRecordsRouter.post(
   requireCap("money.edit"),
   validate(feeSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     const { kind, amount, entryDate, note } = req.body as FeeInput;
 
-    const exists = await prisma.case.findUnique({ where: { id: caseId }, select: { id: true } });
+    const exists = await db.case.findUnique({ where: { id: caseId }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such case.");
 
-    const fee = await prisma.fee.create({
-      data: { caseId, kind, amount, entryDate, note },
+    const fee = await db.fee.create({
+      data: { firmId, caseId, kind, amount, entryDate, note },
       select: { id: true, kind: true, amount: true, entryDate: true, note: true },
     });
 
@@ -314,8 +323,9 @@ officeRecordsRouter.delete(
   "/fees/:id",
   requireCap("money.edit"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.fee.deleteMany({ where: { id } });
+    const removed = await db.fee.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such entry.");
     res.status(204).end();
   })
@@ -350,20 +360,22 @@ officeRecordsRouter.post(
   documentUpload.single("file"),
   validate(documentMetaSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     const file = req.file;
     if (!file) throw new ApiError(400, "No file was sent.");
 
     const { title, clientVisible } = req.body as { title: string; clientVisible: boolean };
 
-    const exists = await prisma.case.findUnique({ where: { id: caseId }, select: { id: true } });
+    const exists = await db.case.findUnique({ where: { id: caseId }, select: { id: true } });
     if (!exists) {
       await fs.promises.unlink(file.path).catch(() => undefined);
       throw new ApiError(404, "No such case.");
     }
 
-    const document = await prisma.document.create({
+    const document = await db.document.create({
       data: {
+        firmId,
         caseId,
         title,
         storedName: file.filename,
@@ -384,11 +396,12 @@ officeRecordsRouter.patch(
   requireCap("documents.edit"),
   validate(documentShareSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const exists = await prisma.document.findUnique({ where: { id }, select: { id: true } });
+    const exists = await db.document.findUnique({ where: { id }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such document.");
 
-    await prisma.document.update({
+    await db.document.update({
       where: { id },
       data: { clientVisible: (req.body as { clientVisible: boolean }).clientVisible },
     });
@@ -401,9 +414,10 @@ officeRecordsRouter.get(
   "/documents/:id",
   requireCap("cases.view"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
 
-    const document = await prisma.document.findUnique({
+    const document = await db.document.findUnique({
       where: { id },
       select: { storedName: true, origName: true, title: true },
     });
@@ -424,11 +438,12 @@ officeRecordsRouter.get(
   "/enquiries",
   requireCap("enquiries.view"),
   validateQuery(enquiryListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { unreadOnly, limit } = res.locals.query as EnquiryListQuery;
 
     const [items, unread] = await Promise.all([
-      prisma.enquiry.findMany({
+      db.enquiry.findMany({
         where: unreadOnly ? { read: false } : {},
         orderBy: { createdAt: "desc" },
         take: limit,
@@ -437,7 +452,7 @@ officeRecordsRouter.get(
           subject: true, message: true, read: true, createdAt: true,
         },
       }),
-      prisma.enquiry.count({ where: { read: false } }),
+      db.enquiry.count({ where: { read: false } }),
     ]);
 
     res.json({ items, unread });
@@ -449,8 +464,9 @@ officeRecordsRouter.patch(
   requireCap("enquiries.view"),
   validate(enquiryReadSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const updated = await prisma.enquiry.updateMany({
+    const updated = await db.enquiry.updateMany({
       where: { id },
       data: { read: (req.body as { read: boolean }).read },
     });

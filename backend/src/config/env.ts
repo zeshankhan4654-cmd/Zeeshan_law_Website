@@ -43,6 +43,11 @@ const schema = Joi.object({
   // choose their own address and walk around the limit.
   TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
 
+  // Which chamber's website this deployment serves on its bare domain.
+  // Behind a sign-in the chamber comes from the session; the public pages
+  // have no session, so they are told here.
+  PLATFORM_FIRM_SLUG: Joi.string().default("arbitrator-law"),
+
   // Failed sign-ins before an identity is locked out, and for how long.
   LOGIN_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
   LOGIN_LOCKOUT_MINUTES: Joi.number().integer().min(1).default(15),
@@ -74,6 +79,7 @@ export const env = {
     apiUrl: value.PUSH_API_URL as string,
     transport: value.PUSH_TRANSPORT as "expo" | "log" | "off",
   },
+  platformFirmSlug: value.PLATFORM_FIRM_SLUG as string,
   login: {
     maxAttempts: value.LOGIN_MAX_ATTEMPTS as number,
     lockoutMinutes: value.LOGIN_LOCKOUT_MINUTES as number,

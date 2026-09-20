@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
-import { prisma } from "../lib/prisma.js";
+import { platformDb } from "../lib/platform.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validateQuery } from "../middleware/validate.js";
 import { libraryListSchema, type LibraryListQuery } from "../validation/library.schema.js";
@@ -12,6 +12,12 @@ import { libraryListSchema, type LibraryListQuery } from "../validation/library.
  *
  * Every query here filters on `published`. An unpublished entry must not be
  * reachable by listing it, searching for it, or guessing its id.
+ *
+ * For now this serves one chamber's library — the platform chamber's. The
+ * shared library, where every chamber may contribute and the platform admin
+ * moderates what appears, is a later milestone; until that moderation
+ * exists, another chamber publishing an entry must not put it on this
+ * website unreviewed.
  */
 export const libraryRouter = Router();
 
@@ -29,6 +35,7 @@ libraryRouter.get(
   "/judgments",
   validateQuery(libraryListSchema),
   asyncHandler(async (_req, res) => {
+    const db = await platformDb();
     const { q, limit, offset } = res.locals.query as LibraryListQuery;
     const where = {
       published: true,
@@ -36,7 +43,7 @@ libraryRouter.get(
     };
 
     const [items, total] = await Promise.all([
-      prisma.judgment.findMany({
+      db.judgment.findMany({
         where,
         orderBy: [{ judgmentDate: "desc" }, { id: "desc" }],
         take: limit,
@@ -46,7 +53,7 @@ libraryRouter.get(
           judgmentDate: true, principle: true, tags: true,
         },
       }),
-      prisma.judgment.count({ where }),
+      db.judgment.count({ where }),
     ]);
 
     res.json({ items, total, limit, offset });
@@ -56,10 +63,11 @@ libraryRouter.get(
 libraryRouter.get(
   "/judgments/:id",
   asyncHandler(async (req, res) => {
+    const db = await platformDb();
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id < 1) throw new ApiError(400, "Not a valid id.");
 
-    const item = await prisma.judgment.findFirst({ where: { id, published: true } });
+    const item = await db.judgment.findFirst({ where: { id, published: true } });
     if (!item) throw new ApiError(404, "There is no such judgment in the library.");
 
     res.json(item);
@@ -70,6 +78,7 @@ libraryRouter.get(
   "/research",
   validateQuery(libraryListSchema),
   asyncHandler(async (_req, res) => {
+    const db = await platformDb();
     const { q, limit, offset } = res.locals.query as LibraryListQuery;
     const where = {
       published: true,
@@ -77,14 +86,14 @@ libraryRouter.get(
     };
 
     const [items, total] = await Promise.all([
-      prisma.research.findMany({
+      db.research.findMany({
         where,
         orderBy: { createdAt: "desc" },
         take: limit,
         skip: offset,
         select: { id: true, title: true, topic: true, summary: true, tags: true, createdAt: true },
       }),
-      prisma.research.count({ where }),
+      db.research.count({ where }),
     ]);
 
     res.json({ items, total, limit, offset });
@@ -94,10 +103,11 @@ libraryRouter.get(
 libraryRouter.get(
   "/research/:id",
   asyncHandler(async (req, res) => {
+    const db = await platformDb();
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id < 1) throw new ApiError(400, "Not a valid id.");
 
-    const item = await prisma.research.findFirst({ where: { id, published: true } });
+    const item = await db.research.findFirst({ where: { id, published: true } });
     if (!item) throw new ApiError(404, "There is no such article in the library.");
 
     res.json(item);
@@ -108,6 +118,7 @@ libraryRouter.get(
   "/media",
   validateQuery(libraryListSchema),
   asyncHandler(async (_req, res) => {
+    const db = await platformDb();
     const { q, limit, offset } = res.locals.query as LibraryListQuery;
     const where = {
       published: true,
@@ -115,14 +126,14 @@ libraryRouter.get(
     };
 
     const [items, total] = await Promise.all([
-      prisma.media.findMany({
+      db.media.findMany({
         where,
         orderBy: [{ recordedOn: "desc" }, { id: "desc" }],
         take: limit,
         skip: offset,
         select: { id: true, title: true, kind: true, topic: true, description: true, recordedOn: true, url: true },
       }),
-      prisma.media.count({ where }),
+      db.media.count({ where }),
     ]);
 
     res.json({ items, total, limit, offset });
@@ -133,10 +144,11 @@ libraryRouter.get(
 libraryRouter.get(
   "/counts",
   asyncHandler(async (_req, res) => {
+    const db = await platformDb();
     const [judgments, research, media] = await Promise.all([
-      prisma.judgment.count({ where: { published: true } }),
-      prisma.research.count({ where: { published: true } }),
-      prisma.media.count({ where: { published: true } }),
+      db.judgment.count({ where: { published: true } }),
+      db.research.count({ where: { published: true } }),
+      db.media.count({ where: { published: true } }),
     ]);
     res.json({ judgments, research, media });
   })

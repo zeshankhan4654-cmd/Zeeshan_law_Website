@@ -32,11 +32,27 @@ const ASSOCIATE_CAPS = [
   "enquiries.view",
 ];
 
+/**
+ * Everything seeded belongs to one chamber — the one this deployment's
+ * public site serves. On a multi-chamber platform there is no such thing as
+ * "the roles" or "the first admin" any more; each chamber gets its own set
+ * when it is created, and this seeds the first one.
+ */
+const FIRM_SLUG = process.env.PLATFORM_FIRM_SLUG ?? "arbitrator-law";
+
 async function main() {
+  const firm = await prisma.firm.upsert({
+    where: { slug: FIRM_SLUG },
+    create: { slug: FIRM_SLUG, name: "The Arbitrator & Law Associates" },
+    update: {},
+  });
+  const firmId = firm.id;
+  console.log(`Seeding chamber "${firm.name}" (${FIRM_SLUG}).`);
+
   for (const role of DEFAULT_ROLES) {
     await prisma.role.upsert({
-      where: { roleKey: role.roleKey },
-      create: role,
+      where: { firmId_roleKey: { firmId, roleKey: role.roleKey } },
+      create: { ...role, firmId },
       update: role,
     });
   }
@@ -47,8 +63,8 @@ async function main() {
   ];
   for (const grant of grants) {
     await prisma.roleCap.upsert({
-      where: { roleKey_cap: grant },
-      create: grant,
+      where: { firmId_roleKey_cap: { firmId, ...grant } },
+      create: { ...grant, firmId },
       update: {},
     });
   }
@@ -56,10 +72,11 @@ async function main() {
   // A way in on a fresh database. The app refuses to let this account touch
   // anything else until its password has been changed — see
   // requireNoPendingPasswordChange. Change it immediately once you are in.
-  const existingAdmin = await prisma.user.count({ where: { role: "admin" } });
+  const existingAdmin = await prisma.user.count({ where: { firmId, role: "admin" } });
   if (existingAdmin === 0) {
     await prisma.user.create({
       data: {
+        firmId,
         username: "admin",
         passwordHash: await hashPassword("admin123"),
         fullName: "Principal",
@@ -74,10 +91,10 @@ async function main() {
 
   // The chamber's opening library. Only seeded into an empty library, so a
   // re-run never duplicates them or overwrites edits made in the office.
-  const existingResearch = await prisma.research.count();
+  const existingResearch = await prisma.research.count({ where: { firmId } });
   if (existingResearch === 0) {
     await prisma.research.createMany({
-      data: RESEARCH_ARTICLES.map((a) => ({ ...a, published: true })),
+      data: RESEARCH_ARTICLES.map((a) => ({ ...a, firmId, published: true })),
     });
     console.log(`Seeded ${RESEARCH_ARTICLES.length} legal research articles.`);
   } else {

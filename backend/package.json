@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.all.json",
     "lint": "eslint src",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
@@ -17,7 +17,8 @@
     "staff:issue": "tsx scripts/issue-staff-login.ts",
     "demo:data": "tsx scripts/demo-case-data.ts",
     "notify:hearings": "tsx scripts/send-hearing-reminders.ts",
-    "backup": "./scripts/backup.sh"
+    "backup": "./scripts/backup.sh",
+    "check:isolation": "tsx scripts/check-isolation.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

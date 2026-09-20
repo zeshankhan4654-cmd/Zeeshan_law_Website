@@ -1,12 +1,12 @@
 import { Router, type Request } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
 import { ROOT_ROLE } from "../lib/capabilities.js";
-import { prisma } from "../lib/prisma.js";
 import {
   requireCap,
   requireNoPendingPasswordChange,
   requireStaff,
   staffSession,
+  tenant,
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
@@ -65,8 +65,9 @@ async function assertMayPublish(
   const session = staffSession(req);
   if (session.role === ROOT_ROLE) return;
 
-  const grant = await prisma.roleCap.findUnique({
-    where: { roleKey_cap: { roleKey: session.role, cap: "library.publish" } },
+  const { db, firmId } = tenant(req);
+  const grant = await db.roleCap.findUnique({
+    where: { firmId_roleKey_cap: { firmId, roleKey: session.role, cap: "library.publish" } },
   });
   if (!grant) {
     throw new ApiError(403, "Your role may write library entries but not publish them.");
@@ -81,17 +82,18 @@ officeLibraryRouter.get(
   "/library/judgments",
   requireCap("library.view"),
   validateQuery(libraryListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { q, limit } = res.locals.query as LibraryAdminQuery;
     const where = search(["title", "citation", "court", "principle", "tags"], q);
 
     const [items, published] = await Promise.all([
-      prisma.judgment.findMany({
+      db.judgment.findMany({
         where,
         orderBy: [{ judgmentDate: "desc" }, { id: "desc" }],
         take: limit,
       }),
-      prisma.judgment.count({ where: { published: true } }),
+      db.judgment.count({ where: { published: true } }),
     ]);
 
     res.json({ items, published });
@@ -103,11 +105,12 @@ officeLibraryRouter.post(
   requireCap("library.edit"),
   validate(judgmentSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const input = req.body as JudgmentInput;
     await assertMayPublish(req, input.published, false);
 
-    const created = await prisma.judgment.create({
-      data: { ...input, judgmentDate: input.judgmentDate || null },
+    const created = await db.judgment.create({
+      data: { ...input, firmId, judgmentDate: input.judgmentDate || null },
       select: { id: true },
     });
     res.status(201).json(created);
@@ -119,14 +122,15 @@ officeLibraryRouter.patch(
   requireCap("library.edit"),
   validate(judgmentSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const existing = await prisma.judgment.findUnique({ where: { id }, select: { published: true } });
+    const existing = await db.judgment.findUnique({ where: { id }, select: { published: true } });
     if (!existing) throw new ApiError(404, "No such judgment.");
 
     const input = req.body as JudgmentInput;
     await assertMayPublish(req, input.published, existing.published);
 
-    await prisma.judgment.update({
+    await db.judgment.update({
       where: { id },
       data: { ...input, judgmentDate: input.judgmentDate || null },
     });
@@ -138,8 +142,9 @@ officeLibraryRouter.delete(
   "/library/judgments/:id",
   requireCap("library.delete"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.judgment.deleteMany({ where: { id } });
+    const removed = await db.judgment.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such judgment.");
     res.status(204).end();
   })
@@ -153,13 +158,14 @@ officeLibraryRouter.get(
   "/library/research",
   requireCap("library.view"),
   validateQuery(libraryListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { q, limit } = res.locals.query as LibraryAdminQuery;
     const where = search(["title", "topic", "summary", "tags"], q);
 
     const [items, published] = await Promise.all([
-      prisma.research.findMany({ where, orderBy: { id: "desc" }, take: limit }),
-      prisma.research.count({ where: { published: true } }),
+      db.research.findMany({ where, orderBy: { id: "desc" }, take: limit }),
+      db.research.count({ where: { published: true } }),
     ]);
 
     res.json({ items, published });
@@ -171,10 +177,11 @@ officeLibraryRouter.post(
   requireCap("library.edit"),
   validate(researchSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const input = req.body as ResearchInput;
     await assertMayPublish(req, input.published, false);
 
-    const created = await prisma.research.create({ data: input, select: { id: true } });
+    const created = await db.research.create({ data: { ...input, firmId }, select: { id: true } });
     res.status(201).json(created);
   })
 );
@@ -184,14 +191,15 @@ officeLibraryRouter.patch(
   requireCap("library.edit"),
   validate(researchSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const existing = await prisma.research.findUnique({ where: { id }, select: { published: true } });
+    const existing = await db.research.findUnique({ where: { id }, select: { published: true } });
     if (!existing) throw new ApiError(404, "No such article.");
 
     const input = req.body as ResearchInput;
     await assertMayPublish(req, input.published, existing.published);
 
-    await prisma.research.update({ where: { id }, data: input });
+    await db.research.update({ where: { id }, data: input });
     res.status(204).end();
   })
 );
@@ -200,8 +208,9 @@ officeLibraryRouter.delete(
   "/library/research/:id",
   requireCap("library.delete"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.research.deleteMany({ where: { id } });
+    const removed = await db.research.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such article.");
     res.status(204).end();
   })
@@ -215,13 +224,14 @@ officeLibraryRouter.get(
   "/library/media",
   requireCap("library.view"),
   validateQuery(libraryListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { q, limit } = res.locals.query as LibraryAdminQuery;
     const where = search(["title", "topic", "description"], q);
 
     const [items, published] = await Promise.all([
-      prisma.media.findMany({ where, orderBy: { id: "desc" }, take: limit }),
-      prisma.media.count({ where: { published: true } }),
+      db.media.findMany({ where, orderBy: { id: "desc" }, take: limit }),
+      db.media.count({ where: { published: true } }),
     ]);
 
     res.json({ items, published });
@@ -233,11 +243,12 @@ officeLibraryRouter.post(
   requireCap("library.edit"),
   validate(mediaSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const input = req.body as MediaInput;
     await assertMayPublish(req, input.published, false);
 
-    const created = await prisma.media.create({
-      data: { ...input, recordedOn: input.recordedOn || null },
+    const created = await db.media.create({
+      data: { ...input, firmId, recordedOn: input.recordedOn || null },
       select: { id: true },
     });
     res.status(201).json(created);
@@ -249,14 +260,15 @@ officeLibraryRouter.patch(
   requireCap("library.edit"),
   validate(mediaSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const existing = await prisma.media.findUnique({ where: { id }, select: { published: true } });
+    const existing = await db.media.findUnique({ where: { id }, select: { published: true } });
     if (!existing) throw new ApiError(404, "No such recording.");
 
     const input = req.body as MediaInput;
     await assertMayPublish(req, input.published, existing.published);
 
-    await prisma.media.update({
+    await db.media.update({
       where: { id },
       data: { ...input, recordedOn: input.recordedOn || null },
     });
@@ -268,8 +280,9 @@ officeLibraryRouter.delete(
   "/library/media/:id",
   requireCap("library.delete"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.media.deleteMany({ where: { id } });
+    const removed = await db.media.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such recording.");
     res.status(204).end();
   })

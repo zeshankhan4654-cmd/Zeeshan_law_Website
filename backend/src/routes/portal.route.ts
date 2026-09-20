@@ -4,7 +4,7 @@ import { signSession, PORTAL_COOKIE, sessionCookieOptions } from "../lib/jwt.js"
 import { clearFailures, lockMinutesRemaining, recordFailure } from "../lib/login-throttle.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
-import { clientSession, requireClient } from "../middleware/auth.js";
+import { clientSession, requireClient, tenant } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
 import { changePasswordSchema, loginSchema } from "../validation/auth.schema.js";
@@ -34,7 +34,12 @@ portalRouter.post(
       throw new ApiError(429, `Too many attempts. Try again in ${wait} minute${wait === 1 ? "" : "s"}.`);
     }
 
-    const client = await prisma.client.findUnique({ where: { portalUsername: username } });
+    // Unscoped by necessity, as with the office sign-in: this is how we
+    // learn which chamber the client belongs to.
+    const client = await prisma.client.findUnique({
+      where: { portalUsername: username },
+      include: { firm: { select: { status: true, suspendedReason: true } } },
+    });
     const valid =
       client?.portalHash ? await verifyPassword(password, client.portalHash) : false;
 
@@ -46,13 +51,20 @@ portalRouter.post(
     // Only reachable by someone who already proved they hold the password, so
     // saying plainly that access is switched off reveals nothing and saves a
     // phone call.
+    if (client.firm.status !== "active") {
+      throw new ApiError(
+        403,
+        "Your advocate's chamber is not currently active. Please contact them directly."
+      );
+    }
+
     if (!client.portalEnabled) {
       throw new ApiError(403, "Your portal access is switched off. Please contact the office.");
     }
 
     await clearFailures(LOGIN_SCOPE, username, ip);
 
-    const token = signSession({ kind: "client", sub: client.id, username });
+    const token = signSession({ kind: "client", sub: client.id, username, firm: client.firmId });
 
     res.cookie(PORTAL_COOKIE, token, sessionCookieOptions);
     res.json({
@@ -75,7 +87,9 @@ portalRouter.get(
   "/me",
   requireClient,
   asyncHandler(async (req, res) => {
-    const client = await prisma.client.findUnique({ where: { id: clientSession(req).sub } });
+    const client = await tenant(req).db.client.findUnique({
+      where: { id: clientSession(req).sub },
+    });
     if (!client?.portalEnabled) {
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }
@@ -100,7 +114,8 @@ portalRouter.post(
       newPassword: string;
     };
 
-    const client = await prisma.client.findUnique({ where: { id: clientSession(req).sub } });
+    const { db } = tenant(req);
+    const client = await db.client.findUnique({ where: { id: clientSession(req).sub } });
     if (!client?.portalEnabled || !client.portalHash) {
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }
@@ -110,7 +125,7 @@ portalRouter.post(
       throw new ApiError(400, "That is not your current password.");
     }
 
-    await prisma.client.update({
+    await db.client.update({
       where: { id: client.id },
       data: {
         portalHash: await hashPassword(newPassword),

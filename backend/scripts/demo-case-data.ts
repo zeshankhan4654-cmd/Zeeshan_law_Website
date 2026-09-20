@@ -4,14 +4,16 @@
  * create real cases.
  *
  *   npm run demo:data -- "Fazal ur Rehman"
+ *   npm run demo:data -- --firm other-chamber "Fazal ur Rehman"
  *
  * Everything it writes is labelled DEMO. It refuses to run against a
  * production database, and re-running it replaces its own rows rather than
  * piling up duplicates.
  */
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/prisma.js";
+import { forFirm } from "../src/lib/tenant.js";
+import { resolveChamber, takeFirmArg } from "./chamber-arg.js";
 
-const prisma = new PrismaClient();
 const MARK = "[DEMO]";
 
 function daysFromNow(days: number): Date {
@@ -26,22 +28,28 @@ async function main() {
     throw new Error("demo:data will not run against a production database.");
   }
 
-  const name = process.argv.slice(2).join(" ").trim();
+  const { slug, rest } = takeFirmArg(process.argv.slice(2));
+  const name = rest.join(" ").trim();
   if (!name) {
-    console.error('Usage: npm run demo:data -- "Client Name"');
+    console.error('Usage: npm run demo:data -- [--firm <slug>] "Client Name"');
     process.exit(1);
   }
 
-  const client = await prisma.client.findFirst({ where: { name } });
+  const chamber = await resolveChamber(slug);
+  const firmId = chamber.id;
+  const db = forFirm(firmId);
+
+  const client = await db.client.findFirst({ where: { name } });
   if (!client) {
-    throw new Error(`No client named "${name}". Run: npm run portal:issue -- "${name}"`);
+    throw new Error(`No client named "${name}". Run: npm run portal:issue -- --firm ${chamber.slug} "${name}"`);
   }
 
   // Replace anything an earlier run left behind (cascades to the children).
-  await prisma.case.deleteMany({ where: { clientId: client.id, title: { startsWith: MARK } } });
+  await db.case.deleteMany({ where: { clientId: client.id, title: { startsWith: MARK } } });
 
-  const matter = await prisma.case.create({
+  const matter = await db.case.create({
     data: {
+      firmId,
       clientId: client.id,
       title: `${MARK} Civil Suit for Specific Performance`,
       court: "Civil Judge, Peshawar",
@@ -52,15 +60,17 @@ async function main() {
     },
   });
 
-  await prisma.hearing.createMany({
+  await db.hearing.createMany({
     data: [
       {
+        firmId,
         caseId: matter.id,
         hearingDate: daysFromNow(-24),
         purpose: "Framing of issues",
         outcome: "INTERNAL: adjourned, opposing counsel unprepared.",
       },
       {
+        firmId,
         caseId: matter.id,
         hearingDate: daysFromNow(-6),
         purpose: "Recording of evidence, plaintiff",
@@ -69,15 +79,17 @@ async function main() {
     ],
   });
 
-  await prisma.caseUpdate.createMany({
+  await db.caseUpdate.createMany({
     data: [
       {
+        firmId,
         caseId: matter.id,
         updateDate: daysFromNow(-24),
         message: "Issues were framed. The court has fixed the matter for evidence.",
         author: "The Arbitrator & Law Associates",
       },
       {
+        firmId,
         caseId: matter.id,
         updateDate: daysFromNow(-6),
         message:
@@ -87,9 +99,10 @@ async function main() {
     ],
   });
 
-  await prisma.document.createMany({
+  await db.document.createMany({
     data: [
       {
+        firmId,
         caseId: matter.id,
         title: `${MARK} Plaint as filed`,
         origName: "plaint.pdf",
@@ -98,6 +111,7 @@ async function main() {
         clientVisible: true,
       },
       {
+        firmId,
         caseId: matter.id,
         title: `${MARK} Office strategy note`,
         origName: "strategy.pdf",
@@ -108,8 +122,9 @@ async function main() {
     ],
   });
 
-  await prisma.caseMessage.create({
+  await db.caseMessage.create({
     data: {
+      firmId,
       caseId: matter.id,
       authorType: "office",
       authorName: "The Arbitrator & Law Associates",
@@ -118,10 +133,10 @@ async function main() {
     },
   });
 
-  await prisma.fee.createMany({
+  await db.fee.createMany({
     data: [
-      { caseId: matter.id, kind: "agreed", amount: 150_000, entryDate: daysFromNow(-40), note: `${MARK} Agreed fee` },
-      { caseId: matter.id, kind: "received", amount: 75_000, entryDate: daysFromNow(-38), note: `${MARK} First instalment` },
+      { firmId, caseId: matter.id, kind: "agreed", amount: 150_000, entryDate: daysFromNow(-40), note: `${MARK} Agreed fee` },
+      { firmId, caseId: matter.id, kind: "received", amount: 75_000, entryDate: daysFromNow(-38), note: `${MARK} First instalment` },
     ],
   });
 
@@ -129,10 +144,10 @@ async function main() {
   // diary something to show for today and the days just ahead.
   const otherName = "Sher Afzal Khan";
   const other =
-    (await prisma.client.findFirst({ where: { name: otherName } })) ??
-    (await prisma.client.create({ data: { name: otherName, phone: "0300-0000000" } }));
+    (await db.client.findFirst({ where: { name: otherName } })) ??
+    (await db.client.create({ data: { firmId, name: otherName, phone: "0300-0000000" } }));
 
-  await prisma.case.deleteMany({ where: { clientId: other.id, title: { startsWith: MARK } } });
+  await db.case.deleteMany({ where: { clientId: other.id, title: { startsWith: MARK } } });
 
   const listed = [
     {
@@ -162,8 +177,9 @@ async function main() {
   ];
 
   for (const entry of listed) {
-    const created = await prisma.case.create({
+    const created = await db.case.create({
       data: {
+        firmId,
         clientId: entry.clientId,
         title: entry.title,
         court: entry.court,
@@ -173,14 +189,15 @@ async function main() {
         notes: "INTERNAL: strategy note, never visible in the portal.",
       },
     });
-    await prisma.hearing.create({
-      data: { caseId: created.id, hearingDate: entry.hearing, purpose: entry.purpose },
+    await db.hearing.create({
+      data: { firmId, caseId: created.id, hearingDate: entry.hearing, purpose: entry.purpose },
     });
   }
 
   // An unanswered client question, so the office list is not empty.
-  await prisma.caseMessage.create({
+  await db.caseMessage.create({
     data: {
+      firmId,
       caseId: matter.id,
       authorType: "client",
       authorName: client.name,
@@ -189,7 +206,8 @@ async function main() {
     },
   });
 
-  console.log(`\n  Demo case created for ${client.name} (case #${matter.id}).`);
+  console.log(`\n  Chamber: ${chamber.name} (${chamber.slug})`);
+  console.log(`  Demo case created for ${client.name} (case #${matter.id}).`);
   console.log(`  Three further matters are listed for the staff diary, one today.`);
   console.log("  It carries an internal case note, an internal hearing outcome and");
   console.log("  an unshared document — all three should be invisible in the portal.\n");

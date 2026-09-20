@@ -76,6 +76,105 @@ curl -c /tmp/c.txt -X POST http://localhost:4000/api/auth/login \
 curl -b /tmp/c.txt http://localhost:4000/api/auth/me
 ```
 
+## Chambers
+
+Every advocate who uses this has their own chamber, and a chamber's work is
+visible to nobody outside it. That is the single most important property in
+the system: a query that forgets which chamber it is in does not return a
+wrong number, it hands one advocate another advocate's privileged client
+file.
+
+**Every table that holds a chamber's work carries `firm_id`.** Twenty-one of
+them do. The two that do not are `firms` itself and `rate_limits`, which is
+deliberately global — somebody working through usernames is one attacker
+whichever chamber they are guessing at, and the throttle runs before a
+sign-in has said which chamber that would be.
+
+**The scoping is not left to call sites.** `backend/src/lib/tenant.ts`
+returns a Prisma client, built per request from the session's chamber, that
+injects the firm into every query through a client extension. A route asks
+for it with `tenant(req)` and then writes ordinary Prisma; a forgotten
+`WHERE` is impossible rather than merely unlikely.
+
+```ts
+const { db, firmId } = tenant(req);
+const cases = await db.case.findMany();   // this chamber's, always
+```
+
+Three things the extension does beyond filtering reads:
+
+- A **create must name its chamber** — `data: { firmId, ... }`. The
+  extension would happily inject it, and did in the first draft; requiring
+  it is better, because the type system then makes every create site say
+  which chamber the row belongs to, and a reviewer reading the line can see
+  the scoping instead of trusting that a wrapper is doing it. Naming the
+  *wrong* chamber throws.
+- An **update cannot move a row** into another chamber. `firmId` is stripped
+  from write payloads, because letting a row walk across the wall is the
+  same leak by a different route.
+- **Unfiltered `deleteMany({})` stops at the chamber's own records.**
+
+Two limits, both of which fail loudly rather than silently: **nested writes**
+into a scoped relation are not reached by the extension and hit the NOT NULL
+constraint on `firm_id`; **`$queryRaw` bypasses extensions entirely** and is
+never used on chamber data.
+
+The list of scoped models is derived from the schema
+(`Prisma.dmmf.datamodel`), not hand-written, so a model added later with a
+`firmId` is protected the moment it exists rather than once somebody
+remembers.
+
+### Proving it, rather than arguing it
+
+```bash
+cd backend && npm run check:isolation
+```
+
+It creates two throwaway chambers, gives each real records — a client, a
+case, a privileged message, a document, a fee, a setting, an article — and
+then has each of them try to reach the other's by every route Prisma offers:
+by id, by `findUniqueOrThrow`, through a list, through `count`, through a
+`_sum` of fees, through `groupBy`, through both composite unique keys,
+through `update`, `delete`, `updateMany`, `deleteMany`, an unfiltered
+`deleteMany`, a create claiming the other chamber, an update trying to move a
+row across, and an `upsert` aimed at the other chamber's row. Both
+directions, because a one-way test passes on a bug that scopes the first
+chamber correctly and the second not at all. It also fails if a model exists
+with neither a `firmId` nor a stated reason.
+
+51 checks. They all have to pass, and it cleans up after itself, so it is
+safe against a development database.
+
+### The public pages
+
+Behind a sign-in the chamber comes from the session. The public website has
+no session, so it is told: `PLATFORM_FIRM_SLUG` names the chamber this
+deployment serves, and `backend/src/lib/platform.ts` resolves it once. Every
+public query — settings, testimonials, articles, the library, and the
+enquiry form's write — runs on that chamber's scoped client. Without it, the
+moment a second advocate published an article it would appear on the first
+one's website under the first one's name.
+
+The public library is scoped the same way for now. The shared library, where
+every chamber may contribute and the platform admin moderates what appears,
+is a later milestone; until that moderation exists, another chamber
+publishing an entry must not put it on this website unreviewed.
+
+### What is still global
+
+`users.username` and `clients.portal_username` remain unique across the
+platform, not per chamber, because they are still how everyone signs in.
+Sign-in therefore runs on the unscoped client — it is how we learn which
+chamber somebody belongs to — and refuses a chamber that is not active,
+after the password has been verified. Moving sign-in to email, so usernames
+can be per-chamber, is the next milestone.
+
+Push tokens are keyed by the token, which is global on purpose: one handset
+is one device wherever its owner practises, and a phone signing in as
+somebody else — including somebody in another chamber — is reassigned. The
+row it writes still names its chamber, and notifications are only ever sent
+to devices within one.
+
 ## Authentication & roles
 
 No public sign-up, by design — client and staff accounts are both issued, not
@@ -134,6 +233,17 @@ screen, portal credentials are issued from the command line:
 cd backend
 npm run portal:issue -- "Fazal ur Rehman"
 ```
+
+Every one of these commands acts on one chamber. It defaults to the chamber
+this deployment's own website serves — `PLATFORM_FIRM_SLUG` — and any other
+is named explicitly:
+
+```bash
+npm run portal:issue -- --firm some-other-chamber "Fazal ur Rehman"
+```
+
+The chamber it acted on is printed back above the password, so it can be
+checked before anything is read down a telephone.
 
 It creates the client if needed, switches the portal on, generates a password
 and prints it **once** — only a bcrypt hash is stored, so it cannot be shown
@@ -676,6 +786,11 @@ cd backend && npm run notify:hearings
 Each hearing carries `reminderSentAt`, set in the same step as the send, so a
 second run the same day tells nobody twice — the failure mode of a cron entry
 is running more often than you meant, not less.
+
+The one entry sweeps every active chamber in turn. A chamber that errors is
+logged and the sweep continues, because one bad record must not mean nobody
+on the platform hears about tomorrow; the job then exits non-zero, which is
+what makes cron send the mail. A suspended chamber is skipped.
 
 `PUSH_TRANSPORT=log` prints what would be sent and sends nothing, which is
 what a development machine wants; `expo` sends for real. `PUSH_API_URL` is

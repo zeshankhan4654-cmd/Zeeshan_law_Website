@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
 import { ROOT_ROLE } from "../lib/capabilities.js";
-import { prisma } from "../lib/prisma.js";
 import { forgetDevice, notify, registerDevice } from "../lib/push.js";
 import {
   requireCap,
   requireNoPendingPasswordChange,
   requireStaff,
   staffSession,
+  tenant,
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
@@ -58,8 +58,9 @@ function parseId(raw: string | undefined): number {
 async function holdsCap(req: Request, cap: string): Promise<boolean> {
   const session = staffSession(req);
   if (session.role === ROOT_ROLE) return true;
-  const grant = await prisma.roleCap.findUnique({
-    where: { roleKey_cap: { roleKey: session.role, cap } },
+  const { db, firmId } = tenant(req);
+  const grant = await db.roleCap.findUnique({
+    where: { firmId_roleKey_cap: { firmId, roleKey: session.role, cap } },
   });
   return grant !== null;
 }
@@ -71,16 +72,18 @@ async function holdsCap(req: Request, cap: string): Promise<boolean> {
  * announce what they are litigating to the room.
  */
 async function notifyClientOfCase(
+  req: Request,
   caseId: number,
   message: { title: string; body: string }
 ): Promise<void> {
-  const found = await prisma.case.findUnique({
+  const { db, firmId } = tenant(req);
+  const found = await db.case.findUnique({
     where: { id: caseId },
     select: { clientId: true },
   });
   if (!found) return;
 
-  await notify("client", [found.clientId], { ...message, path: `/cases/${caseId}` });
+  await notify(firmId, "client", [found.clientId], { ...message, path: `/cases/${caseId}` });
 }
 
 function startOfToday(): Date {
@@ -97,14 +100,15 @@ officeRouter.get(
   "/diary",
   requireCap("cases.view"),
   validateQuery(diarySchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { days } = res.locals.query as DiaryQuery;
 
     const from = startOfToday();
     const to = new Date(from);
     to.setUTCDate(to.getUTCDate() + days);
 
-    const hearings = await prisma.hearing.findMany({
+    const hearings = await db.hearing.findMany({
       where: { hearingDate: { gte: from, lt: to } },
       orderBy: [{ hearingDate: "asc" }, { id: "asc" }],
       select: {
@@ -157,7 +161,8 @@ officeRouter.get(
   "/cases",
   requireCap("cases.view"),
   validateQuery(caseListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { q, status, limit, offset } = res.locals.query as CaseListQuery;
 
     const where = {
@@ -175,7 +180,7 @@ officeRouter.get(
     };
 
     const [items, total] = await Promise.all([
-      prisma.case.findMany({
+      db.case.findMany({
         where,
         orderBy: [{ nextHearing: "asc" }, { id: "desc" }],
         take: limit,
@@ -185,7 +190,7 @@ officeRouter.get(
           client: { select: { id: true, name: true } },
         },
       }),
-      prisma.case.count({ where }),
+      db.case.count({ where }),
     ]);
 
     res.json({ items, total, limit, offset });
@@ -197,9 +202,10 @@ officeRouter.get(
   "/cases/:id",
   requireCap("cases.view"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const caseId = parseId(req.params.id);
 
-    const found = await prisma.case.findUnique({
+    const found = await db.case.findUnique({
       where: { id: caseId },
       select: {
         id: true, title: true, court: true, caseType: true, status: true,
@@ -232,7 +238,7 @@ officeRouter.get(
     // and the Principal see what it is worth.
     const showMoney = await holdsCap(req, "money.view");
     const fees = showMoney
-      ? await prisma.fee.findMany({
+      ? await db.fee.findMany({
           where: { caseId },
           orderBy: { entryDate: "desc" },
           select: { id: true, kind: true, amount: true, entryDate: true, note: true },
@@ -271,8 +277,9 @@ officeRouter.get(
 officeRouter.get(
   "/messages/unanswered",
   requireCap("cases.view"),
-  asyncHandler(async (_req, res) => {
-    const messages = await prisma.caseMessage.findMany({
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const messages = await db.caseMessage.findMany({
       where: { authorType: "client", answered: false },
       orderBy: { createdAt: "asc" },
       take: 50,
@@ -302,18 +309,19 @@ officeRouter.post(
   requireCap("updates.edit"),
   validate(caseUpdateSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     const { message, updateDate } = req.body as CaseUpdateInput;
 
-    const exists = await prisma.case.findUnique({ where: { id: caseId }, select: { id: true } });
+    const exists = await db.case.findUnique({ where: { id: caseId }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such case.");
 
-    const created = await prisma.caseUpdate.create({
-      data: { caseId, message, updateDate, author: staffSession(req).username },
+    const created = await db.caseUpdate.create({
+      data: { firmId, caseId, message, updateDate, author: staffSession(req).username },
       select: { id: true, updateDate: true, message: true, author: true },
     });
 
-    await notifyClientOfCase(caseId, {
+    await notifyClientOfCase(req, caseId, {
       title: "Your case has been updated",
       body: "The chamber has posted something new on your matter.",
     });
@@ -328,16 +336,17 @@ officeRouter.post(
   requireCap("hearings.edit"),
   validate(hearingOutcomeSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const hearingId = parseId(req.params.id);
     const { outcome } = req.body as HearingOutcomeInput;
 
-    const exists = await prisma.hearing.findUnique({
+    const exists = await db.hearing.findUnique({
       where: { id: hearingId },
       select: { id: true },
     });
     if (!exists) throw new ApiError(404, "No such hearing.");
 
-    const updated = await prisma.hearing.update({
+    const updated = await db.hearing.update({
       where: { id: hearingId },
       data: { outcome },
       select: { id: true, hearingDate: true, purpose: true, outcome: true },
@@ -353,21 +362,23 @@ officeRouter.post(
   requireCap("messages.reply"),
   validate(officeReplySchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     const { body } = req.body as OfficeReplyInput;
 
-    const exists = await prisma.case.findUnique({ where: { id: caseId }, select: { id: true } });
+    const exists = await db.case.findUnique({ where: { id: caseId }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such case.");
 
     const session = staffSession(req);
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: session.sub },
       select: { fullName: true },
     });
 
-    const [created] = await prisma.$transaction([
-      prisma.caseMessage.create({
+    const [created] = await db.$transaction([
+      db.caseMessage.create({
         data: {
+          firmId,
           caseId,
           authorType: "office",
           authorName: user?.fullName || session.username,
@@ -376,13 +387,13 @@ officeRouter.post(
         },
         select: { id: true, authorType: true, authorName: true, body: true, answered: true, createdAt: true },
       }),
-      prisma.caseMessage.updateMany({
+      db.caseMessage.updateMany({
         where: { caseId, authorType: "client", answered: false },
         data: { answered: true },
       }),
     ]);
 
-    await notifyClientOfCase(caseId, {
+    await notifyClientOfCase(req, caseId, {
       title: "The chamber has replied",
       body: "There is an answer waiting for you.",
     });
@@ -397,7 +408,7 @@ officeRouter.post(
   validate(registerDeviceSchema),
   asyncHandler(async (req, res) => {
     const { token, platform } = req.body as RegisterDeviceInput;
-    await registerDevice("staff", staffSession(req).sub, token, platform);
+    await registerDevice(tenant(req).firmId, "staff", staffSession(req).sub, token, platform);
     res.status(204).end();
   })
 );

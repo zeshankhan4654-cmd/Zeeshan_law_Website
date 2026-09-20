@@ -5,7 +5,7 @@ import { signSession, SESSION_COOKIE, sessionCookieOptions } from "../lib/jwt.js
 import { clearFailures, lockMinutesRemaining, recordFailure } from "../lib/login-throttle.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
-import { requireStaff, staffSession } from "../middleware/auth.js";
+import { requireStaff, staffSession, tenant } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
 import { changePasswordSchema, loginSchema } from "../validation/auth.schema.js";
@@ -17,9 +17,9 @@ export const authRouter = Router();
  * everything, so the client treats null as "all" rather than being sent a
  * list that could fall out of step with requireCap.
  */
-async function capabilitiesOf(role: string): Promise<string[] | null> {
+async function capabilitiesOf(firmId: number, role: string): Promise<string[] | null> {
   if (role === ROOT_ROLE) return null;
-  const grants = await prisma.roleCap.findMany({ where: { roleKey: role } });
+  const grants = await prisma.roleCap.findMany({ where: { firmId, roleKey: role } });
   return grants.map((g) => g.cap);
 }
 
@@ -37,7 +37,12 @@ authRouter.post(
       throw new ApiError(429, `Too many attempts. Try again in ${wait} minute${wait === 1 ? "" : "s"}.`);
     }
 
-    const user = await prisma.user.findUnique({ where: { username } });
+    // Unscoped by necessity: signing in is how we learn which chamber this
+    // person belongs to. Everything after this point is scoped to it.
+    const user = await prisma.user.findUnique({
+      where: { username },
+      include: { firm: { select: { status: true, suspendedReason: true } } },
+    });
     const valid = user ? await verifyPassword(password, user.passwordHash) : false;
 
     if (!user || !valid) {
@@ -45,10 +50,26 @@ authRouter.post(
       throw new ApiError(401, "Wrong username or password.");
     }
 
+    // Only reachable by someone who proved they hold the password, so the
+    // reason can be given plainly.
+    if (user.firm.status !== "active") {
+      throw new ApiError(
+        403,
+        user.firm.suspendedReason ||
+          "This chamber's access has been suspended. Please contact the platform."
+      );
+    }
+
     await clearFailures(LOGIN_SCOPE, username, ip);
 
-    const token = signSession({ kind: "staff", sub: user.id, username: user.username, role: user.role });
-    const capabilities = await capabilitiesOf(user.role);
+    const token = signSession({
+      kind: "staff",
+      sub: user.id,
+      username: user.username,
+      role: user.role,
+      firm: user.firmId,
+    });
+    const capabilities = await capabilitiesOf(user.firmId, user.role);
 
     // The cookie serves the web app. The token in the body serves the mobile
     // app, which has no cookie jar and stores it in the device keychain.
@@ -77,7 +98,7 @@ authRouter.get(
   "/me",
   requireStaff,
   asyncHandler(async (req, res) => {
-    const user = await prisma.user.findUnique({ where: { id: staffSession(req).sub } });
+    const user = await tenant(req).db.user.findUnique({ where: { id: staffSession(req).sub } });
     if (!user) {
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }
@@ -88,7 +109,7 @@ authRouter.get(
       fullName: user.fullName,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
-      capabilities: await capabilitiesOf(user.role),
+      capabilities: await capabilitiesOf(user.firmId, user.role),
     });
   })
 );
@@ -100,7 +121,8 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
 
-    const user = await prisma.user.findUnique({ where: { id: staffSession(req).sub } });
+    const { db } = tenant(req);
+    const user = await db.user.findUnique({ where: { id: staffSession(req).sub } });
     if (!user) {
       throw new ApiError(401, "Your session has expired. Sign in again.");
     }
@@ -110,7 +132,7 @@ authRouter.post(
       throw new ApiError(400, "That is not your current password.");
     }
 
-    await prisma.user.update({
+    await db.user.update({
       where: { id: user.id },
       data: {
         passwordHash: await hashPassword(newPassword),

@@ -42,10 +42,16 @@ export type SettingKey = keyof typeof SITE_DEFAULTS;
 
 export type SiteSettings = Record<SettingKey, string>;
 
-/** Settings from the database, with any unset key falling back to its default. */
-export async function publicSettings(): Promise<SiteSettings> {
+/**
+ * One chamber's settings, with any unset key falling back to its default.
+ *
+ * The chamber is always named: there is no "the settings" any more, and a
+ * default here would be a quiet way to show one chamber's telephone number
+ * on another's page.
+ */
+export async function publicSettings(firmId: number): Promise<SiteSettings> {
   const rows = await prisma.setting.findMany({
-    where: { key: { in: Object.keys(SITE_DEFAULTS) } },
+    where: { firmId, key: { in: Object.keys(SITE_DEFAULTS) } },
   });
 
   const stored = new Map(rows.map((r) => [r.key, r.value]));

@@ -9,7 +9,7 @@ import {
   type SessionPayload,
   type StaffSession,
 } from "../lib/jwt.js";
-import { prisma } from "../lib/prisma.js";
+import { forFirm, type FirmClient } from "../lib/tenant.js";
 import { ApiError } from "./errorHandler.js";
 
 declare global {
@@ -17,6 +17,12 @@ declare global {
   namespace Express {
     interface Request {
       user?: SessionPayload;
+      /**
+       * A Prisma client that can only reach the signed-in chamber. Every
+       * route past a guard uses this instead of the bare client.
+       */
+      db?: FirmClient;
+      firmId?: number;
     }
   }
 }
@@ -61,6 +67,8 @@ function authenticate(req: Request, cookieName: string, kind: SessionPayload["ki
   }
 
   req.user = session;
+  req.firmId = session.firm;
+  req.db = forFirm(session.firm);
 }
 
 /**
@@ -77,6 +85,20 @@ export function requireStaff(req: Request, _res: Response, next: NextFunction): 
 export function requireClient(req: Request, _res: Response, next: NextFunction): void {
   authenticate(req, PORTAL_COOKIE, "client");
   next();
+}
+
+/**
+ * The chamber-scoped client and firm for a request past a guard.
+ *
+ * Throws rather than falling back to the unscoped client: a route that
+ * reaches this without a session is a routing mistake, and the safe
+ * response to one is to stop.
+ */
+export function tenant(req: Request): { db: FirmClient; firmId: number } {
+  if (!req.db || !req.firmId) {
+    throw new ApiError(401, "Sign in to continue.");
+  }
+  return { db: req.db, firmId: req.firmId };
 }
 
 /** The staff session on a request past `requireStaff`, correctly narrowed. */
@@ -104,7 +126,7 @@ export function clientSession(req: Request): ClientSession {
  */
 export const requireNoPendingPasswordChange = asyncHandler(async (req, _res, next) => {
   const session = staffSession(req);
-  const user = await prisma.user.findUnique({
+  const user = await tenant(req).db.user.findUnique({
     where: { id: session.sub },
     select: { mustChangePassword: true },
   });
@@ -120,7 +142,7 @@ export const requireNoPendingPasswordChange = asyncHandler(async (req, _res, nex
 /** The client-portal counterpart, for the same reason. */
 export const requireNoPendingPortalPasswordChange = asyncHandler(async (req, _res, next) => {
   const session = clientSession(req);
-  const client = await prisma.client.findUnique({
+  const client = await tenant(req).db.client.findUnique({
     where: { id: session.sub },
     select: { portalEnabled: true, portalMustChangePassword: true },
   });
@@ -146,8 +168,9 @@ export function requireCap(cap: string) {
       next();
       return;
     }
-    const grant = await prisma.roleCap.findUnique({
-      where: { roleKey_cap: { roleKey: session.role, cap } },
+    const { db, firmId } = tenant(req);
+    const grant = await db.roleCap.findUnique({
+      where: { firmId_roleKey_cap: { firmId, roleKey: session.role, cap } },
     });
     if (!grant) {
       throw new ApiError(403, "You do not have access to that.");

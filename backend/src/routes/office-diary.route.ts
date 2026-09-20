@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
-import { prisma } from "../lib/prisma.js";
 import {
   requireCap,
   requireNoPendingPasswordChange,
   requireStaff,
+  tenant,
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
@@ -52,7 +52,8 @@ officeDiaryRouter.get(
   "/communications",
   requireCap("comms.view"),
   validateQuery(communicationListSchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { q, dueOnly, limit } = res.locals.query as CommunicationListQuery;
 
     const today = new Date();
@@ -65,7 +66,7 @@ officeDiaryRouter.get(
     };
 
     const [items, due] = await Promise.all([
-      prisma.communication.findMany({
+      db.communication.findMany({
         where,
         orderBy: [{ commDate: "desc" }, { id: "desc" }],
         take: limit,
@@ -75,7 +76,7 @@ officeDiaryRouter.get(
           client: { select: { id: true, name: true } },
         },
       }),
-      prisma.communication.count({ where: { followUpDue: { not: null, lte: today } } }),
+      db.communication.count({ where: { followUpDue: { not: null, lte: today } } }),
     ]);
 
     res.json({ items, due });
@@ -87,18 +88,19 @@ officeDiaryRouter.post(
   requireCap("comms.edit"),
   validate(communicationSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const data = req.body as CommunicationInput;
 
     if (data.clientId !== null) {
-      const client = await prisma.client.findUnique({
+      const client = await db.client.findUnique({
         where: { id: data.clientId },
         select: { id: true },
       });
       if (!client) throw new ApiError(400, "That client does not exist.");
     }
 
-    const created = await prisma.communication.create({
-      data: { ...data, followUpDue: data.followUpDue || null },
+    const created = await db.communication.create({
+      data: { ...data, firmId, followUpDue: data.followUpDue || null },
       select: { id: true },
     });
     res.status(201).json(created);
@@ -110,10 +112,11 @@ officeDiaryRouter.patch(
   requireCap("comms.edit"),
   validate(communicationSchema),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
     const data = req.body as CommunicationInput;
 
-    const updated = await prisma.communication.updateMany({
+    const updated = await db.communication.updateMany({
       where: { id },
       data: { ...data, followUpDue: data.followUpDue || null },
     });
@@ -126,8 +129,9 @@ officeDiaryRouter.delete(
   "/communications/:id",
   requireCap("comms.edit"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.communication.deleteMany({ where: { id } });
+    const removed = await db.communication.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such entry.");
     res.status(204).end();
   })
@@ -141,11 +145,12 @@ officeDiaryRouter.get(
   "/fees",
   requireCap("money.view"),
   validateQuery(ledgerQuerySchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { from, to, limit } = res.locals.query as LedgerQuery;
     const range = between(from, to);
 
-    const items = await prisma.fee.findMany({
+    const items = await db.fee.findMany({
       where: Object.keys(range).length ? { entryDate: range } : {},
       orderBy: [{ entryDate: "desc" }, { id: "desc" }],
       take: limit,
@@ -156,7 +161,7 @@ officeDiaryRouter.get(
     });
 
     // Totals are over every matching entry, not only the page shown.
-    const totals = await prisma.fee.groupBy({
+    const totals = await db.fee.groupBy({
       by: ["kind"],
       where: Object.keys(range).length ? { entryDate: range } : {},
       _sum: { amount: true },
@@ -190,25 +195,26 @@ officeDiaryRouter.get(
   "/official-fees",
   requireCap("money.view"),
   validateQuery(ledgerQuerySchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { from, to, limit } = res.locals.query as LedgerQuery;
     const range = between(from, to);
     const where = Object.keys(range).length ? { entryDate: range } : {};
 
     const [rows, sum] = await Promise.all([
-      prisma.officialFee.findMany({
+      db.officialFee.findMany({
         where,
         orderBy: [{ entryDate: "desc" }, { id: "desc" }],
         take: limit,
       }),
-      prisma.officialFee.aggregate({ where, _sum: { amount: true } }),
+      db.officialFee.aggregate({ where, _sum: { amount: true } }),
     ]);
 
     // OfficialFee has no relation to Case in the schema, so the titles are
     // fetched separately rather than joined.
     const caseIds = [...new Set(rows.map((r) => r.caseId).filter((id): id is number => id !== null))];
     const cases = caseIds.length
-      ? await prisma.case.findMany({ where: { id: { in: caseIds } }, select: { id: true, title: true } })
+      ? await db.case.findMany({ where: { id: { in: caseIds } }, select: { id: true, title: true } })
       : [];
     const titles = new Map(cases.map((c) => [c.id, c.title]));
 
@@ -232,17 +238,18 @@ officeDiaryRouter.post(
   requireCap("money.edit"),
   validate(officialFeeSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const data = req.body as OfficialFeeInput;
 
     if (data.caseId !== null) {
-      const matter = await prisma.case.findUnique({
+      const matter = await db.case.findUnique({
         where: { id: data.caseId },
         select: { id: true },
       });
       if (!matter) throw new ApiError(400, "That case does not exist.");
     }
 
-    const created = await prisma.officialFee.create({ data, select: { id: true } });
+    const created = await db.officialFee.create({ data: { ...data, firmId }, select: { id: true } });
     res.status(201).json(created);
   })
 );
@@ -251,8 +258,9 @@ officeDiaryRouter.delete(
   "/official-fees/:id",
   requireCap("money.edit"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.officialFee.deleteMany({ where: { id } });
+    const removed = await db.officialFee.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such entry.");
     res.status(204).end();
   })
@@ -266,19 +274,20 @@ officeDiaryRouter.get(
   "/expenses",
   requireCap("money.view"),
   validateQuery(ledgerQuerySchema),
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const { from, to, limit } = res.locals.query as LedgerQuery;
     const range = between(from, to);
     const where = Object.keys(range).length ? { expenseDate: range } : {};
 
     const [rows, sum, byCategory] = await Promise.all([
-      prisma.expense.findMany({
+      db.expense.findMany({
         where,
         orderBy: [{ expenseDate: "desc" }, { id: "desc" }],
         take: limit,
       }),
-      prisma.expense.aggregate({ where, _sum: { amount: true } }),
-      prisma.expense.groupBy({ by: ["category"], where, _sum: { amount: true } }),
+      db.expense.aggregate({ where, _sum: { amount: true } }),
+      db.expense.groupBy({ by: ["category"], where, _sum: { amount: true } }),
     ]);
 
     res.json({
@@ -296,8 +305,9 @@ officeDiaryRouter.post(
   requireCap("money.edit"),
   validate(expenseSchema),
   asyncHandler(async (req, res) => {
-    const created = await prisma.expense.create({
-      data: req.body as ExpenseInput,
+    const { db, firmId } = tenant(req);
+    const created = await db.expense.create({
+      data: { ...(req.body as ExpenseInput), firmId },
       select: { id: true },
     });
     res.status(201).json(created);
@@ -308,8 +318,9 @@ officeDiaryRouter.delete(
   "/expenses/:id",
   requireCap("money.edit"),
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const id = parseId(req.params.id);
-    const removed = await prisma.expense.deleteMany({ where: { id } });
+    const removed = await db.expense.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such entry.");
     res.status(204).end();
   })

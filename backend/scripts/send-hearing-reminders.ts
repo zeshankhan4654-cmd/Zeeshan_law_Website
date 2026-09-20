@@ -1,11 +1,15 @@
 /**
- * Reminds clients and the chamber of tomorrow's hearings.
+ * Reminds clients and chambers of tomorrow's hearings.
  *
  *   npm run notify:hearings
  *
  * Meant for a daily cron entry, late afternoon:
  *
  *   30 16 * * *  cd /path/to/backend && /usr/bin/npm run notify:hearings
+ *
+ * One cron entry sweeps every active chamber, each in turn. A chamber that
+ * errors does not stop the ones after it — a single bad record must not
+ * mean nobody on the platform is reminded of tomorrow.
  *
  * Safe to run twice. Each hearing carries `reminderSentAt`, set in the same
  * step as the send, so a second run the same day tells nobody anything
@@ -15,10 +19,9 @@
  * Nothing here names a case. A reminder is read on a lock screen; what the
  * client is litigating is their business, not their bus's.
  */
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/prisma.js";
 import { notify, staffWithCapability } from "../src/lib/push.js";
-
-const prisma = new PrismaClient();
+import { forFirm } from "../src/lib/tenant.js";
 
 function tomorrowRange(): { from: Date; to: Date } {
   const from = new Date();
@@ -31,19 +34,21 @@ function tomorrowRange(): { from: Date; to: Date } {
   return { from, to };
 }
 
-async function main() {
-  const { from, to } = tomorrowRange();
-  const day = from.toISOString().slice(0, 10);
+/** One chamber's reminders. Returns a line for the log. */
+async function remindOneChamber(
+  firmId: number,
+  name: string,
+  from: Date,
+  to: Date
+): Promise<string> {
+  const db = forFirm(firmId);
 
-  const hearings = await prisma.hearing.findMany({
+  const hearings = await db.hearing.findMany({
     where: { hearingDate: { gte: from, lt: to }, reminderSentAt: null },
     select: { id: true, case: { select: { id: true, clientId: true } } },
   });
 
-  if (hearings.length === 0) {
-    console.log(`Nothing listed for ${day}, or every reminder has already gone out.`);
-    return;
-  }
+  if (hearings.length === 0) return `${name}: nothing listed, or already sent.`;
 
   // One notification per client, however many of their matters are listed.
   const byClient = new Map<number, number>();
@@ -53,7 +58,7 @@ async function main() {
 
   let reached = 0;
   for (const [clientId, count] of byClient) {
-    reached += await notify("client", [clientId], {
+    reached += await notify(firmId, "client", [clientId], {
       title: "You have a hearing tomorrow",
       body:
         count === 1
@@ -64,8 +69,8 @@ async function main() {
   }
 
   // And the chamber, once, with a count rather than a list.
-  const staff = await staffWithCapability("cases.view");
-  const staffReached = await notify("staff", staff, {
+  const staff = await staffWithCapability(firmId, "cases.view");
+  const staffReached = await notify(firmId, "staff", staff, {
     title: "Tomorrow's cause list",
     body: `${hearings.length} matter${hearings.length === 1 ? "" : "s"} listed tomorrow.`,
     path: "/diary",
@@ -74,16 +79,46 @@ async function main() {
   // Marked only after the attempt, and marked regardless of whether any
   // device was reachable: a client with no app installed must not keep the
   // job retrying for ever.
-  await prisma.hearing.updateMany({
+  await db.hearing.updateMany({
     where: { id: { in: hearings.map((h) => h.id) } },
     data: { reminderSentAt: new Date() },
   });
 
-  console.log(
-    `${day}: ${hearings.length} hearing(s) — ` +
-      `${byClient.size} client(s) reached on ${reached} device(s), ` +
-      `chamber on ${staffReached} device(s).`
+  return (
+    `${name}: ${hearings.length} hearing(s) — ` +
+    `${byClient.size} client(s) on ${reached} device(s), ` +
+    `chamber on ${staffReached} device(s).`
   );
+}
+
+async function main() {
+  const { from, to } = tomorrowRange();
+  const day = from.toISOString().slice(0, 10);
+
+  // A suspended chamber is not notified. Its work has not gone anywhere,
+  // but the platform is not acting on its behalf while it is suspended.
+  const firms = await prisma.firm.findMany({
+    where: { status: "active" },
+    select: { id: true, name: true },
+    orderBy: { id: "asc" },
+  });
+
+  console.log(`${day}: ${firms.length} active chamber(s).`);
+
+  let failed = 0;
+  for (const firm of firms) {
+    try {
+      console.log(`  ${await remindOneChamber(firm.id, firm.name, from, to)}`);
+    } catch (err) {
+      failed += 1;
+      console.error(`  ${firm.name}: FAILED — ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  if (failed > 0) {
+    // A non-zero exit is what makes cron send the mail.
+    throw new Error(`${failed} chamber(s) could not be reminded.`);
+  }
 }
 
 main()

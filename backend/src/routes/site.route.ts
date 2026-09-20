@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
 import { contentTypeFor, resolveStoredPath } from "../lib/uploads.js";
-import { prisma } from "../lib/prisma.js";
+import { platformDb, platformFirmId } from "../lib/platform.js";
 import { countAction, secondsUntilAllowed } from "../lib/rate-limit.js";
 import { publicSettings } from "../lib/site-settings.js";
 import { ApiError } from "../middleware/errorHandler.js";
@@ -21,6 +21,10 @@ import {
  * No authentication anywhere here, by design. Everything read is something
  * the chamber has deliberately published — every query filters on
  * `published`, the same rule the library follows.
+ *
+ * There is no session here to name a chamber, so every query runs on the
+ * platform chamber's scoped client (see lib/platform.ts). That is what
+ * keeps another advocate's article off this website.
  */
 export const siteRouter = Router();
 
@@ -31,14 +35,15 @@ const ENQUIRY_COOLOFF_MINUTES = 60;
 siteRouter.get(
   "/settings",
   asyncHandler(async (_req, res) => {
-    res.json(await publicSettings());
+    res.json(await publicSettings(await platformFirmId()));
   })
 );
 
 siteRouter.get(
   "/testimonials",
   asyncHandler(async (_req, res) => {
-    const items = await prisma.testimonial.findMany({
+    const db = await platformDb();
+    const items = await db.testimonial.findMany({
       where: { published: true },
       orderBy: [{ sortOrder: "asc" }, { id: "desc" }],
       take: 24,
@@ -55,6 +60,7 @@ siteRouter.get(
   "/posts",
   validateQuery(postListSchema),
   asyncHandler(async (_req, res) => {
+    const db = await platformDb();
     const { q, category, limit, offset } = res.locals.query as PostListQuery;
 
     const where = {
@@ -72,7 +78,7 @@ siteRouter.get(
     };
 
     const [items, total, categories] = await Promise.all([
-      prisma.post.findMany({
+      db.post.findMany({
         where,
         orderBy: [{ publishedOn: "desc" }, { id: "desc" }],
         take: limit,
@@ -82,9 +88,9 @@ siteRouter.get(
           coverName: true, author: true, publishedOn: true,
         },
       }),
-      prisma.post.count({ where }),
+      db.post.count({ where }),
       // For the filter row, from published posts only.
-      prisma.post.findMany({
+      db.post.findMany({
         where: { published: true, category: { not: "" } },
         distinct: ["category"],
         select: { category: true },
@@ -99,9 +105,10 @@ siteRouter.get(
 siteRouter.get(
   "/posts/:slug",
   asyncHandler(async (req, res) => {
+    const db = await platformDb();
     const slug = String(req.params.slug ?? "").slice(0, 200);
 
-    const post = await prisma.post.findFirst({
+    const post = await db.post.findFirst({
       where: { slug, published: true },
       select: {
         id: true, slug: true, title: true, summary: true, body: true,
@@ -112,7 +119,7 @@ siteRouter.get(
     if (!post) throw new ApiError(404, "No such article.");
 
     // Best effort: a failed counter must never fail the page.
-    await prisma.post
+    await db.post
       .update({ where: { id: post.id }, data: { views: { increment: 1 } } })
       .catch(() => undefined);
 
@@ -132,9 +139,10 @@ siteRouter.get(
 siteRouter.get(
   "/posts/:slug/cover",
   asyncHandler(async (req, res) => {
+    const db = await platformDb();
     const slug = String(req.params.slug ?? "").slice(0, 200);
 
-    const post = await prisma.post.findFirst({
+    const post = await db.post.findFirst({
       where: { slug, published: true },
       select: { coverName: true },
     });
@@ -182,8 +190,10 @@ siteRouter.post(
     }
     await countAction("enquiry", ip, ip, ENQUIRY_MAX, ENQUIRY_COOLOFF_MINUTES);
 
-    await prisma.enquiry.create({
+    const db = await platformDb();
+    await db.enquiry.create({
       data: {
+        firmId: await platformFirmId(),
         name: enquiry.name,
         phone: enquiry.phone,
         email: enquiry.email,

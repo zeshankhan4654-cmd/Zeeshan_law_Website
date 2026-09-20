@@ -2,7 +2,6 @@ import fs from "node:fs";
 import { Router } from "express";
 import multer from "multer";
 import { asyncHandler } from "../lib/async-handler.js";
-import { prisma } from "../lib/prisma.js";
 import {
   audioExtension,
   contentTypeFor,
@@ -16,6 +15,7 @@ import {
   clientSession,
   requireClient,
   requireNoPendingPortalPasswordChange,
+  tenant,
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
@@ -60,9 +60,9 @@ function parseId(raw: string | undefined): number {
  * Deliberately says nothing about the case or the client: this is rendered
  * on a lock screen, and whose matter it is, is not for a passer-by.
  */
-async function notifyOfficeOfClientMessage(caseId: number): Promise<void> {
-  const recipients = await staffWithCapability("messages.reply");
-  await notify("staff", recipients, {
+async function notifyOfficeOfClientMessage(firmId: number, caseId: number): Promise<void> {
+  const recipients = await staffWithCapability(firmId, "messages.reply");
+  await notify(firmId, "staff", recipients, {
     title: "A client is waiting",
     body: "A question has come in through the portal.",
     path: `/files/${caseId}`,
@@ -71,7 +71,8 @@ async function notifyOfficeOfClientMessage(caseId: number): Promise<void> {
 
 /** The case, only if it belongs to the signed-in client. */
 async function ownedCase(req: Request, caseId: number) {
-  const found = await prisma.case.findFirst({
+  const { db } = tenant(req);
+  const found = await db.case.findFirst({
     where: { id: caseId, clientId: clientSession(req).sub },
     select: { id: true, title: true, court: true, caseType: true, status: true, nextHearing: true, createdAt: true },
   });
@@ -82,7 +83,8 @@ async function ownedCase(req: Request, caseId: number) {
 portalCasesRouter.get(
   "/cases",
   asyncHandler(async (req, res) => {
-    const cases = await prisma.case.findMany({
+    const { db } = tenant(req);
+    const cases = await db.case.findMany({
       where: { clientId: clientSession(req).sub },
       orderBy: [{ nextHearing: "asc" }, { id: "desc" }],
       select: {
@@ -109,28 +111,29 @@ portalCasesRouter.get(
 portalCasesRouter.get(
   "/cases/:id",
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const caseId = parseId(req.params.id);
     const found = await ownedCase(req, caseId);
 
     const [hearings, updates, documents, client] = await Promise.all([
-      prisma.hearing.findMany({
+      db.hearing.findMany({
         where: { caseId },
         orderBy: { hearingDate: "desc" },
         // `outcome` is the office's own note on what happened and is not shared.
         select: { id: true, hearingDate: true, purpose: true },
       }),
-      prisma.caseUpdate.findMany({
+      db.caseUpdate.findMany({
         where: { caseId },
         orderBy: [{ updateDate: "desc" }, { id: "desc" }],
         select: { id: true, updateDate: true, message: true, author: true },
       }),
-      prisma.document.findMany({
+      db.document.findMany({
         // Private unless the office deliberately shared it.
         where: { caseId, clientVisible: true },
         orderBy: { createdAt: "desc" },
         select: { id: true, title: true, origName: true, sizeBytes: true, createdAt: true },
       }),
-      prisma.client.findUnique({
+      db.client.findUnique({
         where: { id: clientSession(req).sub },
         select: { portalShowFees: true },
       }),
@@ -139,7 +142,7 @@ portalCasesRouter.get(
     // Money is shown only where the office has switched it on for this client.
     const showFees = client?.portalShowFees ?? false;
     const fees = showFees
-      ? await prisma.fee.findMany({
+      ? await db.fee.findMany({
           where: { caseId },
           orderBy: { entryDate: "desc" },
           select: { id: true, kind: true, amount: true, entryDate: true, note: true },
@@ -169,10 +172,11 @@ portalCasesRouter.get(
 portalCasesRouter.get(
   "/cases/:id/messages",
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const caseId = parseId(req.params.id);
     await ownedCase(req, caseId);
 
-    const messages = await prisma.caseMessage.findMany({
+    const messages = await db.caseMessage.findMany({
       where: { caseId },
       orderBy: { createdAt: "asc" },
       select: {
@@ -201,21 +205,22 @@ portalCasesRouter.post(
   "/cases/:id/messages",
   validate(caseMessageSchema),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     await ownedCase(req, caseId);
     const { body } = req.body as CaseMessageInput;
 
-    const client = await prisma.client.findUnique({
+    const client = await db.client.findUnique({
       where: { id: clientSession(req).sub },
       select: { name: true },
     });
 
-    const message = await prisma.caseMessage.create({
-      data: { caseId, authorType: "client", authorName: client?.name ?? "", body },
+    const message = await db.caseMessage.create({
+      data: { firmId, caseId, authorType: "client", authorName: client?.name ?? "", body },
       select: { id: true, authorType: true, authorName: true, body: true, answered: true, createdAt: true },
     });
 
-    await notifyOfficeOfClientMessage(caseId);
+    await notifyOfficeOfClientMessage(firmId, caseId);
 
     res.status(201).json({ ...message, hasVoiceNote: false });
   })
@@ -250,6 +255,7 @@ portalCasesRouter.post(
   "/cases/:id/messages/voice",
   voiceUpload.single("audio"),
   asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
     const file = req.file;
     if (!file) throw new ApiError(400, "No recording was sent.");
@@ -264,13 +270,14 @@ portalCasesRouter.post(
       throw err;
     }
 
-    const client = await prisma.client.findUnique({
+    const client = await db.client.findUnique({
       where: { id: clientSession(req).sub },
       select: { name: true },
     });
 
-    const message = await prisma.caseMessage.create({
+    const message = await db.caseMessage.create({
       data: {
+        firmId,
         caseId,
         authorType: "client",
         authorName: client?.name ?? "",
@@ -281,7 +288,7 @@ portalCasesRouter.post(
       select: { id: true, authorType: true, authorName: true, body: true, answered: true, createdAt: true },
     });
 
-    await notifyOfficeOfClientMessage(caseId);
+    await notifyOfficeOfClientMessage(firmId, caseId);
 
     res.status(201).json({ ...message, hasVoiceNote: true });
   })
@@ -290,9 +297,10 @@ portalCasesRouter.post(
 portalCasesRouter.get(
   "/messages/:id/audio",
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const messageId = parseId(req.params.id);
 
-    const message = await prisma.caseMessage.findFirst({
+    const message = await db.caseMessage.findFirst({
       where: { id: messageId, case: { clientId: clientSession(req).sub } },
       select: { storedName: true },
     });
@@ -309,9 +317,10 @@ portalCasesRouter.get(
 portalCasesRouter.get(
   "/documents/:id",
   asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
     const documentId = parseId(req.params.id);
 
-    const document = await prisma.document.findFirst({
+    const document = await db.document.findFirst({
       where: {
         id: documentId,
         clientVisible: true,
@@ -340,7 +349,7 @@ portalCasesRouter.post(
   validate(registerDeviceSchema),
   asyncHandler(async (req, res) => {
     const { token, platform } = req.body as RegisterDeviceInput;
-    await registerDevice("client", clientSession(req).sub, token, platform);
+    await registerDevice(tenant(req).firmId, "client", clientSession(req).sub, token, platform);
     res.status(204).end();
   })
 );
