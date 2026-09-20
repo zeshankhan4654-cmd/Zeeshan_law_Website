@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch, ApiError } from "./api";
+import { registerDevice, unregisterDevice } from "./push-registration";
 import { deleteSecure, readSecure, writeSecure } from "./secure-store";
 
 /**
@@ -141,6 +142,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       await writeSecure(TOKEN_KEY, JSON.stringify(stored));
       const account = toAccount(audience, data);
       setState({ status: "signed-in", account, token: data.token });
+
+      // Not awaited: being reachable by notification is a convenience, and
+      // must never hold up the sign-in that a person is waiting on.
+      void registerDevice(audience, data.token);
+
       return account;
     },
     []
@@ -148,6 +154,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     const audience = state.status === "signed-in" ? state.account.kind : null;
+    if (audience && state.status === "signed-in") {
+      // Before the token goes: this call needs it, and a handset left
+      // registered would keep receiving the previous holder's
+      // notifications.
+      await unregisterDevice(audience, state.token);
+    }
     if (audience) {
       // Best effort: clearing the server cookie matters for the browser
       // target. The token is a bearer token, so what counts is dropping it.

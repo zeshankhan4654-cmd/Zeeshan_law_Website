@@ -52,6 +52,13 @@ module.exports = {
     "expo-router",
     "expo-secure-store",
     [
+      "expo-notifications",
+      {
+        icon: "./assets/adaptive-icon.png",
+        color: "#9a7622",
+      },
+    ],
+    [
       "expo-av",
       {
         // Shown in the system permission dialogue, so it has to say why in
