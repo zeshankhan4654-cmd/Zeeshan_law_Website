@@ -307,12 +307,37 @@ role in the list and so made **Principal** the default. A clerk clicking
 briskly would have created an administrator without choosing to; the role
 must now be picked explicitly.
 
-### The sidebar only lists screens that exist
+### The diary, the ledgers and the library
 
-The original build's menu also had the communications diary, official fees,
-office expenses, the library editors, the blog, reviews, settings and
-accounts. Those return as Phase 6 builds them — a sidebar item that leads
-nowhere is worse than one that is not there yet.
+The office is now complete: the communications diary (with overdue
+follow-ups flagged, because that is the reason to open it), professional
+fees read across every matter, official fees, office expenses totalled by
+category, and editors for judgments, research and recordings.
+
+Professional fees are read-only here on purpose. A fee belongs to a matter
+and is recorded on that matter's own file, where the context is; this
+screen answers "what is outstanding" across everything.
+
+### The citation rule, enforced rather than remembered
+
+**A judgment cannot be published without its citation.** That is the
+chamber's own rule — nothing goes on the public site that has not been
+checked against the report — and it lives in the API, so it holds whoever
+is typing and whatever screen they are using. A draft may be as incomplete
+as you like; a published entry may not. A recording likewise needs a link
+before it can go up.
+
+**Publishing is a capability of its own.** `library.edit` writes a draft;
+`library.publish` puts it on the firm's public website under the firm's
+name. A colleague holds the first and not the second, which is tested:
+they may draft an article and are refused when they try to publish it, or
+to take a published one down.
+
+### The sidebar
+
+Every screen the chamber has, grouped as the original build grouped them,
+each item naming the capability that makes it visible — so a colleague's
+sidebar is shorter than the Principal's.
 
 ## The client portal
 
@@ -402,7 +427,8 @@ are human:
 - [x] **Phase 3** — public marketing site
 - [x] **Phase 4** — client portal + login flows
 - [x] **Phase 5** — office core: clients, cases, hearings, money, documents, enquiries
-- [x] **Phase 6** — Site Settings, client reviews, writing, accounts & roles
+- [x] **Phase 6** — Site Settings, reviews, writing, accounts & roles,
+      the communications diary, the money ledgers and the library editors
 - [ ] Phase 7 — hardening & deployment
 
 ### The mobile app
