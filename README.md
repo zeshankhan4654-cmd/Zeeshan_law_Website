@@ -218,6 +218,48 @@ that test in instructive ways, and the comments in
 What ships is a CSS load-time fade with no scroll position and no script to
 wait on, skipped entirely for anyone who has asked for less motion.
 
+## The office
+
+Clients, cases, hearings, money, documents and the enquiries that arrive
+from the website. Server Components with small client islands for the
+actions, each refreshing the route on success so the server's copy stays
+the only copy.
+
+**This is what retires the command-line scripts.** A clerk adds a client,
+switches their portal on and reads out the password, opens a case, records
+a hearing and shares a document without touching a terminal. The whole
+chain was tested that way in a browser, and then the client it created
+signed in and saw exactly what had been shared with them.
+
+### Issuing a password from a screen
+
+The password is generated on the server, shown **once**, and stored only as
+a bcrypt hash. The screen says so plainly, because a clerk who expects to
+look it up later will write it down somewhere worse. `npm run portal:issue`
+still exists for a database with no office running; both use the same
+`lib/credentials.ts`, so they cannot drift.
+
+### What a client sees is three separate decisions
+
+Nothing about a case reaches a client by default:
+
+- `Case.notes` and `Hearing.outcome` are the chamber's own and never leave
+  it, whatever anyone ticks.
+- A **document** is private until the office deliberately shares it — one
+  click on the file, reversible.
+- **Fees** are a per-client setting, off unless switched on.
+
+All three were checked from both ends: the office sharing a document and
+the client then seeing it; the office ticking the fees box and the fees
+appearing; and the chamber's strategy note remaining absent throughout.
+
+### The sidebar only lists screens that exist
+
+The original build's menu also had the communications diary, official fees,
+office expenses, the library editors, the blog, reviews, settings and
+accounts. Those return as Phase 6 builds them — a sidebar item that leads
+nowhere is worse than one that is not there yet.
+
 ## The client portal
 
 At `/client`, gated the same way the office is: a Server Component reads
@@ -305,7 +347,7 @@ are human:
       auth exists to build it against)
 - [x] **Phase 3** — public marketing site
 - [x] **Phase 4** — client portal + login flows
-- [ ] Phase 5 — office core (cases, clients, money, diary)
+- [x] **Phase 5** — office core: clients, cases, hearings, money, documents, enquiries
 - [ ] Phase 6 — office content tools (blog, reviews, settings, roles)
 - [ ] Phase 7 — hardening & deployment
 

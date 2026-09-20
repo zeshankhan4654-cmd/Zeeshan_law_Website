@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { authRouter } from "./routes/auth.route.js";
 import { healthRouter } from "./routes/health.route.js";
 import { libraryRouter } from "./routes/library.route.js";
+import { officeRecordsRouter } from "./routes/office-records.route.js";
 import { officeRouter } from "./routes/office.route.js";
 import { portalCasesRouter } from "./routes/portal-cases.route.js";
 import { portalRouter } from "./routes/portal.route.js";
@@ -43,6 +44,7 @@ export function createApp(): Express {
   app.use("/api/auth", authRouter);
   app.use("/api/library", libraryRouter);
   app.use("/api/office", officeRouter);
+  app.use("/api/office", officeRecordsRouter);
   app.use("/api/portal", portalRouter);
   app.use("/api/portal", portalCasesRouter);
   app.use("/api/site", siteRouter);
