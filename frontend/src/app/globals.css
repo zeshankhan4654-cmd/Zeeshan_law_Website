@@ -94,3 +94,38 @@ dialog::backdrop {
     animation: none;
   }
 }
+
+/* ---------- Section reveal (components/site/Reveal.tsx) ---------- */
+
+/*
+ * A gentle entrance, and nothing more.
+ *
+ * Two earlier attempts were wrong in instructive ways. Framer Motion's
+ * `initial` is inlined during server rendering, so the page's own content
+ * was delivered at opacity 0 and stayed there until JavaScript hydrated —
+ * a blank practice-areas section for a crawler or a blocked script. A
+ * scroll-driven timeline fixed that but broke the other end: an element
+ * already on screen at load never completes its `entry` range, because the
+ * page cannot be scrolled up any further, so the hero sat permanently
+ * half-faded.
+ *
+ * This runs on load, from CSS alone, and finishes. There is no scroll
+ * position and no script it can be waiting on, so no section can be left
+ * invisible by either.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: reveal-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

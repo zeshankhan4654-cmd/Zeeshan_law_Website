@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Scales of justice">
+  <!--
+    The firm's mark, on the same 120-unit grid as the app icon
+    (scripts/make-icons.php), so the mark on the phone is the mark on the
+    site. currentColor, so one file serves the gold header and the dark
+    footer without a second copy.
+  -->
+  <g fill="currentColor">
+    <rect x="52" y="14" width="16" height="8" />
+    <rect x="55" y="22" width="10" height="70" />
+    <rect x="14" y="26" width="92" height="9" />
+    <rect x="42" y="85" width="36" height="8" />
+    <rect x="32" y="93" width="56" height="9" />
+    <rect x="22" y="35" width="4" height="16" />
+    <polygon points="6,51 42,51 31,71 17,71" />
+    <rect x="94" y="35" width="4" height="16" />
+    <polygon points="78,51 114,51 103,71 89,71" />
+  </g>
+</svg>
