@@ -18,7 +18,9 @@
     "demo:data": "tsx scripts/demo-case-data.ts",
     "notify:hearings": "tsx scripts/send-hearing-reminders.ts",
     "backup": "./scripts/backup.sh",
-    "check:isolation": "tsx scripts/check-isolation.ts"
+    "check:isolation": "tsx scripts/check-isolation.ts",
+    "platform:grant": "tsx scripts/grant-platform-admin.ts",
+    "platform:revoke": "tsx scripts/grant-platform-admin.ts --revoke"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

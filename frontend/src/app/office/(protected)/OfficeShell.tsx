@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, KeyRound, LogOut, Scale } from "lucide-react";
+import { Building2, Globe, KeyRound, LogOut, Scale } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -48,6 +48,16 @@ export function OfficeShell({ user, children }: { user: SessionUser; children: R
             <span className="block text-[0.68rem] font-normal text-gold-bright">Office Diary</span>
           </span>
         </Link>
+
+        {user.platformAdmin && (
+          <Link
+            href="/platform"
+            className="mx-3 mt-3 flex items-center gap-2.5 rounded-md bg-gold/15 px-3 py-2 text-sm text-gold-bright ring-1 ring-gold/30 hover:bg-gold/25"
+          >
+            <Building2 className="size-4" strokeWidth={1.6} />
+            Platform
+          </Link>
+        )}
 
         <nav className="flex-1 py-3">
           {OFFICE_NAV.map((section) => {

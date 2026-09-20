@@ -108,6 +108,9 @@ authRouter.post(
       emailIsPlaceholder: user.email.endsWith(".invalid"),
       capabilities,
       chamber: await chamberOf(user.firmId),
+      // Only decides whether the office shows a link to the console. The
+      // console itself re-checks on every request, against the database.
+      platformAdmin: user.platformAdmin,
       token,
     });
   })
@@ -137,6 +140,7 @@ authRouter.get(
       emailIsPlaceholder: user.email.endsWith(".invalid"),
       capabilities: await capabilitiesOf(user.firmId, user.role),
       chamber: await chamberOf(user.firmId),
+      platformAdmin: user.platformAdmin,
     });
   })
 );

@@ -46,17 +46,22 @@ siteRouter.get(
  * The slug is already in the link the advocate handed out, so this reveals
  * nothing that was secret; what it adds is the chamber's name on the page,
  * which is what tells a client they are in the right place rather than on
- * somebody's imitation of it. Nothing else about the chamber is returned,
- * and a suspended one is not found at all.
+ * somebody's imitation of it.
+ *
+ * A suspended chamber is still found, and says so. Answering with a 404
+ * would leave its clients staring at what looks like a broken link and
+ * doubting the address their own advocate gave them. What is *not* returned
+ * is the reason: that is between the platform and the advocate, and it is
+ * the advocate's to explain to their clients, not ours.
  */
 siteRouter.get(
   "/chambers/:slug",
   asyncHandler(async (req, res) => {
     const slug = String(req.params.slug ?? "").slice(0, 64).toLowerCase();
 
-    const firm = await prisma.firm.findFirst({
-      where: { slug, status: "active" },
-      select: { slug: true, name: true },
+    const firm = await prisma.firm.findUnique({
+      where: { slug },
+      select: { slug: true, name: true, status: true },
     });
     if (!firm) throw new ApiError(404, "No such chamber.");
 

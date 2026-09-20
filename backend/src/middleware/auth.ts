@@ -157,6 +157,51 @@ export const requireNoPendingPortalPasswordChange = asyncHandler(async (req, _re
 });
 
 /**
+ * Runs the platform itself, not merely a chamber.
+ *
+ * Checked against the database on every request rather than carried in the
+ * token: this is the authority to stop other advocates working, and it must
+ * stop the moment it is revoked, not whenever a twelve-hour token happens
+ * to expire.
+ *
+ * It does not widen the office. A platform admin's `req.db` is still scoped
+ * to their own chamber, because it comes from their own session — being a
+ * platform admin adds the console and nothing else.
+ */
+export const requirePlatformAdmin = asyncHandler(async (req, _res, next) => {
+  const session = staffSession(req);
+
+  const user = await tenant(req).db.user.findUnique({
+    where: { id: session.sub },
+    select: { platformAdmin: true, email: true, mustChangePassword: true },
+  });
+
+  if (!user?.platformAdmin) {
+    // The same answer somebody who is simply not a platform admin gets, so
+    // the console's existence is not confirmed to anyone poking at it.
+    throw new ApiError(404, "Not found.");
+  }
+  if (user.mustChangePassword) {
+    throw new ApiError(403, "Change your password before continuing.");
+  }
+
+  next();
+});
+
+/** The signed-in platform admin's id and address, for the audit record. */
+export async function platformActor(req: Request): Promise<{ id: number; email: string }> {
+  const session = staffSession(req);
+  const user = await tenant(req).db.user.findUnique({
+    where: { id: session.sub },
+    select: { id: true, email: true, platformAdmin: true },
+  });
+  if (!user?.platformAdmin) {
+    throw new ApiError(404, "Not found.");
+  }
+  return { id: user.id, email: user.email };
+}
+
+/**
  * Requires a specific capability. The Principal (ROOT_ROLE) always passes,
  * whatever role_caps contains, so there is no way to lock the one account
  * that grants access out of granting it.

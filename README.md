@@ -148,7 +148,9 @@ email address, that a chamber cannot reuse its own handle, that each
 address resolves to its own chamber, and that one chamber's portal password
 does not open the other chamber's identically-named client.
 
-61 checks. They all have to pass, and it cleans up after itself, so it is
+Then the platform-admin cases above.
+
+72 checks. They all have to pass, and it cleans up after itself, so it is
 safe against a development database.
 
 ### The public pages
@@ -238,6 +240,89 @@ is one device wherever its owner practises, and a phone signing in as
 somebody else — including somebody in another chamber — is reassigned. The
 row it writes still names its chamber, and notifications are only ever sent
 to devices within one.
+
+### Running the platform
+
+A handful of people run the platform itself. `users.platform_admin` says
+who, and it is deliberately a property of a **person**, not of a chamber:
+tying it to "any Principal of the first chamber" would mean that the day a
+colleague is made Principal, they silently acquire the power to suspend
+other advocates' practices.
+
+It is granted only from a terminal, never through a screen — this is access
+to the server, not merely an office session somebody left signed in:
+
+```bash
+cd backend
+npm run platform:grant  -- zeshan@arbitratorandlaw.com
+npm run platform:revoke -- somebody@example.com
+npm run platform:grant  -- --list
+```
+
+Revoking the last one is refused, so the console cannot be made
+unreachable.
+
+The console is at `/platform`, and it shows every chamber, its size, when
+it was last worked in, whether it is verified and whether it is active.
+Two things can be done to a chamber: **verification**, which is a statement
+that somebody checked this is really an advocate, and **suspension**, which
+stops everybody in that chamber signing in — the advocate, their colleagues
+and their clients.
+
+A suspension requires a reason, because the reason is what the advocate is
+shown when they try to sign in. Their clients are told only that the
+chamber is not currently signing people in and to telephone it: why a
+chamber is suspended is between the platform and the advocate, and it is
+the advocate's to explain to their own clients. Nothing is deleted; the
+work comes back whole on restore.
+
+Every verification and suspension is written to `platform_audit` with who
+did it and the reason they gave, and shown in the console. The power to
+stop an advocate working should not be usable quietly. That table has no
+foreign keys on purpose: the record must outlive both the admin's account
+and the chamber it concerns.
+
+A platform admin cannot suspend their own chamber — the console is reached
+through a session in it, so they would be locking themselves out of the
+thing that undoes it.
+
+Deleting a chamber is deliberately **not** offered. It would erase an
+advocate's entire practice on a cascade, with no undo and nothing exported
+first. Suspension stops whatever a deletion would be reached for and leaves
+the work intact. A real deletion needs an export beside it, and that is its
+own piece of work.
+
+#### What a platform admin cannot do
+
+**Read inside a chamber.** Not as a matter of the console showing less than
+it could — as a matter of there being nothing to show it with.
+
+- Every read the console makes goes through
+  `backend/src/lib/platform-stats.ts`, which returns counts, dates and
+  chamber metadata. The rule is stated at the top of that file: no function
+  in it may return a row, or a field of a row, from a chamber-scoped table.
+  Chamber sizes come back through Prisma's `_count`, which cannot be coaxed
+  into carrying a field of a related row, and "last activity" through a
+  `groupBy` `_max` over a timestamp, which cannot carry a case title.
+- There is no route anywhere on the platform that takes a chamber id and
+  returns its records. A platform admin signed into the office reaches
+  their own chamber and no other, exactly like everybody else, because the
+  scoped client comes from their own session. Being a platform admin adds
+  the console; it does not widen the office.
+- The chamber search matches the chamber's own name, slug and enrolment
+  number. It deliberately does not search clients or cases — a console that
+  can answer "which chamber acts for X" is a console that reads inside
+  chambers.
+
+`npm run check:isolation` checks both halves: that a platform admin's
+ordinary queries still see only their own chamber, and that nothing the
+console returns contains a client name, a case title, a message body, a
+document title or a setting value. It serialises the console's whole
+response and searches it, so a field added later without thought fails the
+check rather than shipping.
+
+Someone who is not a platform admin is answered **404**, not 403, so the
+console's existence is not confirmed to anybody poking at the address.
 
 ## Authentication & roles
 

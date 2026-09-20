@@ -128,7 +128,12 @@ export function whatsappHref(settings: SiteSettings): string | null {
   return `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
 }
 
-export type PublicChamber = { slug: string; name: string };
+export type PublicChamber = {
+  slug: string;
+  name: string;
+  /** "active" | "suspended". Never why. */
+  status: string;
+};
 
 /**
  * A chamber by the slug in its client sign-in link, or null if there is no

@@ -135,6 +135,8 @@ signupRouter.post(
       emailIsPlaceholder: false,
       // The Principal holds everything, which the client reads as null.
       capabilities: null,
+      // Registering a chamber never makes anybody a platform admin.
+      platformAdmin: false,
       token,
       chamber: {
         slug: firm.slug,

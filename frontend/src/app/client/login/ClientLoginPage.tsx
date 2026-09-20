@@ -16,7 +16,11 @@ import { PortalLoginForm } from "./PortalLoginForm";
  * from the link they were sent and this page carries its name — a sign-in
  * page with nobody's name on it is what a phishing copy of one looks like.
  */
-export async function ClientLoginPage({ chamber }: { chamber: { slug: string; name: string } }) {
+export async function ClientLoginPage({
+  chamber,
+}: {
+  chamber: { slug: string; name: string; status: string };
+}) {
   // Already signed in: no reason to show a sign-in form.
   const client = await getPortalClient();
   if (client) redirect(client.mustChangePassword ? "/client/change-password" : "/client");
@@ -39,7 +43,18 @@ export async function ClientLoginPage({ chamber }: { chamber: { slug: string; na
             <h1 className="font-display text-2xl text-ink">Sign in to your matter</h1>
           </div>
 
-          <PortalLoginForm chamber={chamber.slug} />
+          {chamber.status === "active" ? (
+            <PortalLoginForm chamber={chamber.slug} />
+          ) : (
+            /* The link is right; the chamber is not currently active. Why
+               that is, is between the chamber and the platform, and it is
+               the advocate's to explain — so this says only that they
+               should be spoken to. */
+            <p className="rounded-card border border-rule bg-ground p-4 text-sm leading-6 text-ink">
+              {chamber.name} is not currently signing clients in. Your link is correct —
+              please telephone the chamber directly.
+            </p>
+          )}
 
           <p className="text-sm leading-6 text-ink-soft">
             Forgotten your password? Telephone {chamber.name} and a new one

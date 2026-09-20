@@ -22,6 +22,12 @@ export type SessionUser = {
   capabilities: string[] | null;
   /** The chamber this session is in. */
   chamber: Chamber | null;
+  /**
+   * Runs the platform itself, not merely this chamber. Only decides whether
+   * the office shows a link to the console — the console re-checks against
+   * the database on every request of its own.
+   */
+  platformAdmin: boolean;
 };
 
 export type Chamber = {

@@ -14,6 +14,7 @@ import { officeLibraryRouter } from "./routes/office-library.route.js";
 import { officeRecordsRouter } from "./routes/office-records.route.js";
 import { officeRouter } from "./routes/office.route.js";
 import { portalCasesRouter } from "./routes/portal-cases.route.js";
+import { platformRouter } from "./routes/platform.route.js";
 import { portalRouter } from "./routes/portal.route.js";
 import { signupRouter } from "./routes/signup.route.js";
 import { siteRouter } from "./routes/site.route.js";
@@ -72,6 +73,7 @@ export function createApp(): Express {
   app.use("/api/office", officeContentRouter);
   app.use("/api/office", officeDiaryRouter);
   app.use("/api/office", officeLibraryRouter);
+  app.use("/api/platform", platformRouter);
   app.use("/api/portal", portalRouter);
   app.use("/api/portal", portalCasesRouter);
   app.use("/api/signup", signupRouter);

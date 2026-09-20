@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { hashPassword, verifyPassword } from "../src/lib/password.js";
+import { listChambers } from "../src/lib/platform-stats.js";
 import { prisma } from "../src/lib/prisma.js";
 import { forFirm, scopedModelNames } from "../src/lib/tenant.js";
 
@@ -365,6 +366,87 @@ async function probeIdentities(a: Chamber, b: Chamber): Promise<void> {
   }
 }
 
+/**
+ * A platform admin runs the platform. They do not read inside chambers.
+ *
+ * The console's own reads go through lib/platform-stats.ts, which returns
+ * counts and dates. This checks the other half — that being a platform
+ * admin does not widen the ordinary office at all, because the scoped
+ * client still comes from the admin's own session.
+ */
+async function probePlatformAdmin(a: Chamber, b: Chamber): Promise<void> {
+  console.log("\n  A platform admin:");
+
+  await prisma.user.update({
+    where: { id: a.staff.id },
+    data: { platformAdmin: true },
+  });
+
+  // Their session names their own chamber, so this is the client every
+  // office route gets for them. Being a platform admin changes nothing
+  // about it.
+  const theirs = forFirm(a.firm.id);
+
+  expectNothing(
+    "still cannot read another chamber's client",
+    await theirs.client.findUnique({ where: { id: b.client.id } })
+  );
+  expectNothing(
+    "still cannot read another chamber's case",
+    await theirs.case.findFirst({ where: { id: b.matter.id } })
+  );
+  // Naming the other chamber outright in the `where` is overridden, not
+  // honoured: the scope is applied last and wins. So this returns their own
+  // message or nothing — never the other chamber's.
+  const reached = await theirs.caseMessage.findFirst({ where: { firmId: b.firm.id } });
+  if (reached && reached.firmId !== a.firm.id) {
+    fail("asking for another chamber's messages by firm id", `got firm ${reached.firmId}`);
+  } else {
+    ok("asking for another chamber's messages by firm id returns only its own");
+  }
+  expectEqual(
+    "still counts only its own cases",
+    await theirs.case.count(),
+    1
+  );
+
+  // What the console is allowed to know, and the shape of it.
+  const { items } = await listChambers({ q: "", status: "", verified: "", limit: 100, offset: 0 });
+  const other = items.find((c) => c.id === b.firm.id);
+
+  if (!other) {
+    fail("the console can see that the other chamber exists", "it was not listed");
+    return;
+  }
+  ok("the console can see that the other chamber exists");
+  expectEqual("and how many clients it has", other.counts.clients, 1);
+
+  // The load-bearing check: nothing in what the console returns is a name,
+  // a title or a body from inside the chamber. Serialised whole and
+  // searched, so a field added later without thought is caught here.
+  const serialised = JSON.stringify(items);
+  const mustNotAppear: [string, string][] = [
+    ["a client's name", `${b.firm.name}'s client`],
+    ["a case title", b.matter.title],
+    ["a privileged message", "witness box"],
+    ["a document title", "Draft affidavit"],
+    ["a setting's value", `secret-${b.firm.slug}`],
+  ];
+
+  for (const [what, needle] of mustNotAppear) {
+    if (serialised.includes(needle)) {
+      fail(`the console never returns ${what}`, `found "${needle}"`);
+    } else {
+      ok(`the console never returns ${what}`);
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: a.staff.id },
+    data: { platformAdmin: false },
+  });
+}
+
 /** Every model that holds chamber work must be scoped; this says which are not. */
 function reportCoverage(): void {
   console.log("\n  Schema coverage:");
@@ -375,8 +457,10 @@ function reportCoverage(): void {
 
   console.log(`  ✓ ${scoped.size} models scoped to a chamber`);
 
-  // Firm is the chambers themselves; RateLimit is deliberately global.
-  const expectedUnscoped = new Set(["Firm", "RateLimit"]);
+  // Firm is the chambers themselves; RateLimit and PlatformAudit are
+  // deliberately platform-level — a throttle and a record of what was done
+  // *to* chambers, neither of which belongs inside one.
+  const expectedUnscoped = new Set(["Firm", "RateLimit", "PlatformAudit"]);
   const unexpected = unscoped.filter((name) => !expectedUnscoped.has(name));
 
   if (unexpected.length === 0) {
@@ -402,6 +486,7 @@ async function main(): Promise<void> {
     await probe(a, b);
     await probe(b, a);
     await probeIdentities(a, b);
+    await probePlatformAdmin(a, b);
     reportCoverage();
   } finally {
     await prisma.firm.deleteMany({ where: { id: { in: [a.firm.id, b.firm.id] } } });

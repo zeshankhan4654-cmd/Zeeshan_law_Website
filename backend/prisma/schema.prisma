@@ -104,6 +104,23 @@ model User {
   mustChangePassword Boolean  @default(false) @map("must_change_password")
   createdAt          DateTime @default(now()) @map("created_at")
 
+  /// Runs the platform itself, not merely this chamber.
+  ///
+  /// Deliberately a property of a person rather than of a chamber. Tying it
+  /// to "any Principal of the first chamber" would mean that the day a
+  /// colleague is made Principal, they silently acquire the power to
+  /// suspend other advocates' practices.
+  ///
+  /// It grants exactly what running a platform needs — chamber metadata,
+  /// counts, verification and suspension — and nothing that reaches inside
+  /// a chamber. There is no route anywhere that takes a chamber id and
+  /// returns its records; see lib/platform-stats.ts.
+  ///
+  /// Granted only from the command line (npm run platform:grant), never
+  /// through a screen, so it cannot be handed out by a session somebody
+  /// left signed in.
+  platformAdmin Boolean @default(false) @map("platform_admin")
+
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
@@ -174,6 +191,31 @@ model PushToken {
 /// login for the same name are counted independently — and the public
 /// enquiry form, the one unauthenticated write on the site. The shape suits
 /// both, so they share a table rather than a near-duplicate one.
+/// What a platform admin did to somebody else's chamber, and why.
+///
+/// The counterpart of the power itself. Suspending a chamber stops an
+/// advocate working, so it is not something that should be possible to do
+/// quietly — every use is written down here with who did it and the reason
+/// they gave. Platform-level by nature, so it carries no firm_id of its
+/// own; `firm_id_acted_on` names the chamber it was done to.
+model PlatformAudit {
+  id            Int      @id @default(autoincrement())
+  /// users.id of the platform admin. Not a relation: the record must
+  /// outlive the account, or deleting yourself would erase what you did.
+  actorId       Int      @map("actor_id")
+  actorEmail    String   @map("actor_email")
+  /// "verify" | "unverify" | "suspend" | "restore"
+  action        String
+  firmIdActedOn Int      @map("firm_id_acted_on")
+  firmSlug      String   @map("firm_slug")
+  reason        String   @default("")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([firmIdActedOn, createdAt])
+  @@index([createdAt])
+  @@map("platform_audit")
+}
+
 /// Deliberately *not* scoped to a chamber. A brute-forcer working through
 /// usernames is one attacker whichever chamber they are guessing at, and the
 /// throttle runs before a sign-in has told us which chamber that would be.
