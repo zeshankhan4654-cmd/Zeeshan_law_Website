@@ -8,7 +8,7 @@ working increment.
 
 | Layer | Choice |
 |---|---|
-| Frontend | Next.js (App Router) + TypeScript |
+| Frontend | Next.js 16 (App Router) + React 19 + TypeScript |
 | Data fetching | TanStack Query |
 | Styling | Tailwind CSS v4 (brand tokens in `frontend/src/app/globals.css`) |
 | Icons | lucide-react |
@@ -470,18 +470,31 @@ trusting `X-Forwarded-For` blindly lets a caller choose their own.
 `UPLOAD_DIR` should point **outside** the repository, so a redeployment
 cannot delete the clients' documents.
 
-### The one dependency advisory that remains
+### Dependencies
 
-`npm audit` reports a postcss advisory inside Next 15's own dependencies.
-Next pins `postcss` at exactly `8.4.31`, so no `overrides` entry can move
-it — the fix is Next 16, a major upgrade.
+`npm audit` reports **no vulnerabilities**.
 
-It is left as it is deliberately. postcss here runs at **build time**, over
-this project's own CSS; the advisories require processing CSS an attacker
-controls, which never happens. The top-level `postcss` that Tailwind uses
-*is* overridden to a patched release, and the backend audits clean. Moving
-to Next 16 is worth doing as its own deliberate piece of work, not as a
-last-minute change to a working system.
+Getting there meant moving to Next 16. Next 15 pinned `postcss` at exactly
+`8.4.31`, which carried four advisories and which no `overrides` entry
+could shift — the only fix was the major upgrade. It was done on its own,
+after everything else worked, so that a regression would have an obvious
+cause. Two things needed changing:
+
+- **The ESLint config.** Next 15 had no flat config, so this project
+  translated the old one through `FlatCompat`. Next 16's config contains a
+  circular reference that the eslintrc validator cannot serialise, and lint
+  died with a stack trace rather than a lint error. Next 16 ships real flat
+  configs, which are now imported directly.
+- **One genuine finding** from Next 16's stricter React rules: the mobile
+  menu closed itself with `setState` inside an effect, which renders the
+  page once with the menu still open and again without it. It now adjusts
+  during render, which React documents as the alternative — and which also
+  catches the back button, where a click handler would not.
+
+Every browser suite was re-run afterwards: the public site, the client
+portal including a recorded voice note, the whole office, capability
+gating, rendering with JavaScript switched off, and both audiences signed
+in at once. All passed, with no page errors.
 
 ## Conventions
 
