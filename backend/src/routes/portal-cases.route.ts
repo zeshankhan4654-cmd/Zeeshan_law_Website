@@ -11,6 +11,7 @@ import {
   uploadDirFor,
 } from "../lib/uploads.js";
 import { env } from "../config/env.js";
+import { forgetDevice, notify, registerDevice, staffWithCapability } from "../lib/push.js";
 import {
   clientSession,
   requireClient,
@@ -18,6 +19,12 @@ import {
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
+import {
+  forgetDeviceSchema,
+  registerDeviceSchema,
+  type ForgetDeviceInput,
+  type RegisterDeviceInput,
+} from "../validation/device.schema.js";
 import { caseMessageSchema, type CaseMessageInput } from "../validation/portal.schema.js";
 import type { Request } from "express";
 
@@ -45,6 +52,21 @@ function parseId(raw: string | undefined): number {
   const id = Number(raw);
   if (!Number.isInteger(id) || id < 1) throw new ApiError(400, "Not a valid id.");
   return id;
+}
+
+/**
+ * Tells the staff who answer clients that one is waiting.
+ *
+ * Deliberately says nothing about the case or the client: this is rendered
+ * on a lock screen, and whose matter it is, is not for a passer-by.
+ */
+async function notifyOfficeOfClientMessage(caseId: number): Promise<void> {
+  const recipients = await staffWithCapability("messages.reply");
+  await notify("staff", recipients, {
+    title: "A client is waiting",
+    body: "A question has come in through the portal.",
+    path: `/files/${caseId}`,
+  });
 }
 
 /** The case, only if it belongs to the signed-in client. */
@@ -193,6 +215,8 @@ portalCasesRouter.post(
       select: { id: true, authorType: true, authorName: true, body: true, answered: true, createdAt: true },
     });
 
+    await notifyOfficeOfClientMessage(caseId);
+
     res.status(201).json({ ...message, hasVoiceNote: false });
   })
 );
@@ -257,6 +281,8 @@ portalCasesRouter.post(
       select: { id: true, authorType: true, authorName: true, body: true, answered: true, createdAt: true },
     });
 
+    await notifyOfficeOfClientMessage(caseId);
+
     res.status(201).json({ ...message, hasVoiceNote: true });
   })
 );
@@ -299,5 +325,32 @@ portalCasesRouter.get(
     if (!filePath || !fs.existsSync(filePath)) throw new ApiError(404, "No such document.");
 
     res.download(filePath, document.origName || document.title);
+  })
+);
+
+/**
+ * This handset would like to be told when the office answers.
+ *
+ * Registering binds the token to whoever is signed in now, so a phone that
+ * changes hands stops receiving the previous client's notifications the
+ * moment somebody else signs in on it.
+ */
+portalCasesRouter.post(
+  "/devices",
+  validate(registerDeviceSchema),
+  asyncHandler(async (req, res) => {
+    const { token, platform } = req.body as RegisterDeviceInput;
+    await registerDevice("client", clientSession(req).sub, token, platform);
+    res.status(204).end();
+  })
+);
+
+/** Signing out takes the device off the list. */
+portalCasesRouter.delete(
+  "/devices",
+  validate(forgetDeviceSchema),
+  asyncHandler(async (req, res) => {
+    await forgetDevice((req.body as ForgetDeviceInput).token);
+    res.status(204).end();
   })
 );

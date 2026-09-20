@@ -2,6 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
 import { ROOT_ROLE } from "../lib/capabilities.js";
 import { prisma } from "../lib/prisma.js";
+import { forgetDevice, notify, registerDevice } from "../lib/push.js";
 import {
   requireCap,
   requireNoPendingPasswordChange,
@@ -10,6 +11,12 @@ import {
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
+import {
+  forgetDeviceSchema,
+  registerDeviceSchema,
+  type ForgetDeviceInput,
+  type RegisterDeviceInput,
+} from "../validation/device.schema.js";
 import {
   caseListSchema,
   caseUpdateSchema,
@@ -55,6 +62,25 @@ async function holdsCap(req: Request, cap: string): Promise<boolean> {
     where: { roleKey_cap: { roleKey: session.role, cap } },
   });
   return grant !== null;
+}
+
+/**
+ * Tells a case's client that something has happened.
+ *
+ * The body never names the matter. A client's phone on a desk should not
+ * announce what they are litigating to the room.
+ */
+async function notifyClientOfCase(
+  caseId: number,
+  message: { title: string; body: string }
+): Promise<void> {
+  const found = await prisma.case.findUnique({
+    where: { id: caseId },
+    select: { clientId: true },
+  });
+  if (!found) return;
+
+  await notify("client", [found.clientId], { ...message, path: `/cases/${caseId}` });
 }
 
 function startOfToday(): Date {
@@ -287,6 +313,11 @@ officeRouter.post(
       select: { id: true, updateDate: true, message: true, author: true },
     });
 
+    await notifyClientOfCase(caseId, {
+      title: "Your case has been updated",
+      body: "The chamber has posted something new on your matter.",
+    });
+
     res.status(201).json(created);
   })
 );
@@ -351,6 +382,31 @@ officeRouter.post(
       }),
     ]);
 
+    await notifyClientOfCase(caseId, {
+      title: "The chamber has replied",
+      body: "There is an answer waiting for you.",
+    });
+
     res.status(201).json({ ...created, hasVoiceNote: false });
+  })
+);
+
+/** A chamber handset asking to be told when a client writes in. */
+officeRouter.post(
+  "/devices",
+  validate(registerDeviceSchema),
+  asyncHandler(async (req, res) => {
+    const { token, platform } = req.body as RegisterDeviceInput;
+    await registerDevice("staff", staffSession(req).sub, token, platform);
+    res.status(204).end();
+  })
+);
+
+officeRouter.delete(
+  "/devices",
+  validate(forgetDeviceSchema),
+  asyncHandler(async (req, res) => {
+    await forgetDevice((req.body as ForgetDeviceInput).token);
+    res.status(204).end();
   })
 );

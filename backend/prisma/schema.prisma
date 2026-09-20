@@ -57,6 +57,24 @@ model RoleCap {
   @@map("role_caps")
 }
 
+/// A device registered for push notifications, bound to the party that was
+/// signed in when it registered. The token is unique: a handset that signs
+/// in as somebody else is reassigned, never shared, so the previous holder's
+/// notifications stop reaching it.
+model PushToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  /// "client" | "staff" — the same two audiences as a session.
+  kind       String
+  subjectId  Int      @map("subject_id")
+  platform   String   @default("")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @updatedAt @map("last_seen_at")
+
+  @@index([kind, subjectId])
+  @@map("push_tokens")
+}
+
 /// Failed sign-in tracking, keyed by (scope, identity, ip) so a client login
 /// and an office login for the same name are throttled independently.
 model LoginAttempt {
@@ -131,6 +149,9 @@ model Hearing {
   purpose     String   @default("")
   /// Internal only — never shown to the client portal.
   outcome     String   @default("")
+  /// When the reminder for this hearing went out, so a re-run of the
+  /// reminder job never tells anyone twice.
+  reminderSentAt DateTime? @map("reminder_sent_at")
   createdAt   DateTime @default(now()) @map("created_at")
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)

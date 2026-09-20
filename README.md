@@ -237,7 +237,7 @@ no sign-in), clients (their own cases), and staff (the diary, at court).
 - [x] **A2** — sign-in for clients and staff, tokens in the device keychain
 - [x] **A3** — client tier: cases, hearings, documents, native voice notes
 - [x] **A4** — staff tier: cause list and case files on the phone
-- [ ] A5 — push notifications for hearing dates and new messages
+- [x] **A5** — push notifications for hearing dates and new messages
 - [x] **A6 (part)** — app icon, splash, EAS build profiles, installable
       preview APK. Store listings and privacy policy still to do, and are
       only needed for Play Store / App Store submission, not for the
@@ -327,6 +327,57 @@ bearer token with the media request, so a recording is as protected as
 everything else. The web target cannot — an HTML audio element has no way to
 carry headers — so playback fails there and says so. That affects
 `expo start --web` only, never a built app.
+
+#### Notifications
+
+Through Expo's push service. Four things are sent: the chamber hears when a
+client writes in, the client hears when the chamber replies or posts a
+progress note, and both hear the evening before a hearing.
+
+**What a notification is allowed to say** matters more here than anywhere
+else in this codebase, because it is rendered on a lock screen, in public, by
+an operating system that does not know what a case is.
+
+- A client is never told anything *about* their matter. "You have a hearing
+  tomorrow" is useful; naming the case on a phone lying on a table is a
+  disclosure they did not agree to.
+- Staff are told how many matters are listed, not which — a cause list
+  glimpsed over a shoulder is still a disclosure.
+- A client's question never appears in the notification the office receives.
+
+The detail is in the app, behind the sign-in. Tapping carries you to it.
+
+**A phone that changes hands.** The push token is unique in the table, so a
+handset that somebody else signs in on is *reassigned*, not shared — the
+previous holder's notifications stop reaching it at that moment. Signing out
+also deregisters the device explicitly, before the session token it needs to
+do so is dropped. Both halves were tested.
+
+Delivery is best effort by design: `notify()` never throws, so a client's
+message is saved whether or not the office's phones can be reached. A token
+Expo reports as `DeviceNotRegistered` — an uninstalled app — is deleted
+rather than retried for ever, and batches are split at Expo's limit of 100.
+
+**Hearing reminders** are a daily job rather than anything in-process:
+
+```bash
+cd backend && npm run notify:hearings
+```
+
+```cron
+30 16 * * *  cd /path/to/backend && /usr/bin/npm run notify:hearings
+```
+
+Each hearing carries `reminderSentAt`, set in the same step as the send, so a
+second run the same day tells nobody twice — the failure mode of a cron entry
+is running more often than you meant, not less.
+
+`PUSH_TRANSPORT=log` prints what would be sent and sends nothing, which is
+what a development machine wants; `expo` sends for real. `PUSH_API_URL` is
+configurable so a test can point the real code path at a local stub.
+
+Notifications are an iOS and Android feature. The web target has no
+notification API and is guarded out of every call.
 
 #### How the phone holds a session
 

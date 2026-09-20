@@ -15,7 +15,8 @@
     "prisma:studio": "prisma studio",
     "portal:issue": "tsx scripts/issue-portal-login.ts",
     "staff:issue": "tsx scripts/issue-staff-login.ts",
-    "demo:data": "tsx scripts/demo-case-data.ts"
+    "demo:data": "tsx scripts/demo-case-data.ts",
+    "notify:hearings": "tsx scripts/send-hearing-reminders.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

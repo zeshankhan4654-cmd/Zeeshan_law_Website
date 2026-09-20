@@ -29,6 +29,13 @@ const schema = Joi.object({
   // sentence or two, not a recording of the hearing.
   VOICE_NOTE_MAX_MB: Joi.number().min(1).max(50).default(10),
 
+  // Expo's push service. Overridable so a development machine can point at
+  // a local stub, and so the address is not compiled in.
+  PUSH_API_URL: Joi.string().uri().default("https://exp.host/--/api/v2/push/send"),
+  // "expo" sends for real; "log" writes what would have been sent and sends
+  // nothing, which is what a development machine wants.
+  PUSH_TRANSPORT: Joi.string().valid("expo", "log", "off").default("expo"),
+
   // Failed sign-ins before an identity is locked out, and for how long.
   LOGIN_MAX_ATTEMPTS: Joi.number().integer().min(1).default(8),
   LOGIN_LOCKOUT_MINUTES: Joi.number().integer().min(1).default(15),
@@ -55,6 +62,10 @@ export const env = {
   },
   uploadDir: value.UPLOAD_DIR as string,
   voiceNoteMaxBytes: (value.VOICE_NOTE_MAX_MB as number) * 1024 * 1024,
+  push: {
+    apiUrl: value.PUSH_API_URL as string,
+    transport: value.PUSH_TRANSPORT as "expo" | "log" | "off",
+  },
   login: {
     maxAttempts: value.LOGIN_MAX_ATTEMPTS as number,
     lockoutMinutes: value.LOGIN_LOCKOUT_MINUTES as number,
