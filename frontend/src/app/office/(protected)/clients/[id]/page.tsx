@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NotPermitted, PageHeading } from "@/components/office/PageHeading";
 import { officeFetch, type ClientDetail } from "@/lib/office-data";
+import { can } from "@/lib/office-nav";
+import { getSessionUser } from "@/lib/session";
 import { formatDate } from "@/lib/portal-types";
 import { ClientForm } from "../ClientForm";
 import { PortalAccess } from "../PortalAccess";
@@ -12,8 +14,14 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const clientId = Number(id);
   if (!Number.isInteger(clientId) || clientId < 1) notFound();
 
-  const client = await officeFetch<ClientDetail>(`/api/office/clients/${clientId}`);
+  const [client, user] = await Promise.all([
+    officeFetch<ClientDetail>(`/api/office/clients/${clientId}`),
+    getSessionUser(),
+  ]);
   if (!client) return <NotPermitted />;
+
+  const mayEdit = can(user?.role, user?.capabilities, "clients.edit");
+  const mayIssuePortal = can(user?.role, user?.capabilities, "clients.portal");
 
   return (
     <>
@@ -76,6 +84,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             </section>
           )}
 
+          {mayIssuePortal && (
           <PortalAccess
             clientId={client.id}
             enabled={client.portalEnabled}
@@ -83,16 +92,19 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             showFees={client.portalShowFees}
             mustChangePassword={client.portalMustChangePassword}
           />
+          )}
         </div>
 
-        <details className="rounded-card border border-rule bg-surface">
-          <summary className="cursor-pointer px-6 py-4 text-sm font-medium text-ink">
-            Edit these details
-          </summary>
-          <div className="border-t border-rule p-2">
-            <ClientForm id={client.id} initial={client} />
-          </div>
-        </details>
+        {mayEdit && (
+          <details className="rounded-card border border-rule bg-surface">
+            <summary className="cursor-pointer px-6 py-4 text-sm font-medium text-ink">
+              Edit these details
+            </summary>
+            <div className="border-t border-rule p-2">
+              <ClientForm id={client.id} initial={client} />
+            </div>
+          </details>
+        )}
       </div>
 
       <p className="pt-6 text-xs text-ink-soft">Client since {formatDate(client.createdAt)}</p>

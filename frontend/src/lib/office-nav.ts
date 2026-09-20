@@ -1,4 +1,15 @@
-import { Calendar, Folder, Gauge, Inbox, Users } from "lucide-react";
+import {
+  Calendar,
+  FileText,
+  Folder,
+  Gauge,
+  Inbox,
+  Newspaper,
+  Settings,
+  ShieldCheck,
+  Star,
+  Users,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -18,10 +29,9 @@ export type NavSection = {
  * The office sidebar.
  *
  * Only screens that exist are listed. The original build's full menu also
- * had the communications diary, official fees, office expenses, the library
- * editors, the blog, reviews, settings and accounts; those return here as
- * Phase 6 builds them. A sidebar item that leads nowhere is worse than one
- * that is not there yet.
+ * had the communications diary, official fees, office expenses and the
+ * library editors; those return here as they are built. A sidebar item that
+ * leads nowhere is worse than one that is not there yet.
  */
 export const OFFICE_NAV: NavSection[] = [
   {
@@ -39,8 +49,20 @@ export const OFFICE_NAV: NavSection[] = [
     ],
   },
   {
+    heading: "The website",
+    items: [
+      { label: "Writing", href: "/office/blog", icon: Newspaper, cap: "blog.edit" },
+      { label: "Client Reviews", href: "/office/testimonials", icon: Star, cap: "testimonials.edit" },
+      { label: "Site Settings", href: "/office/settings", icon: Settings, cap: "site.settings" },
+    ],
+  },
+  {
     heading: "Office",
-    items: [{ label: "Enquiries", href: "/office/enquiries", icon: Inbox, cap: "enquiries.view" }],
+    items: [
+      { label: "Enquiries", href: "/office/enquiries", icon: Inbox, cap: "enquiries.view" },
+      { label: "Accounts", href: "/office/users", icon: FileText, cap: "users.manage" },
+      { label: "Roles & Access", href: "/office/roles", icon: ShieldCheck, cap: "users.manage" },
+    ],
   },
 ];
 
@@ -52,4 +74,22 @@ export function canSeeNavItem(item: NavItem, role: string, capabilities: string[
   if (!item.cap) return true;
   if (role === ROOT_ROLE) return true; // the Principal sees everything
   return capabilities?.includes(item.cap) ?? false;
+}
+
+/**
+ * Whether a signed-in user holds a capability.
+ *
+ * This decides what to *show*. The API checks the same capability on every
+ * request, so hiding a control is a courtesy to the person — it stops them
+ * filling in a form that was always going to be refused — never the
+ * control itself.
+ */
+export function can(
+  role: string | undefined,
+  capabilities: string[] | null | undefined,
+  cap: string
+): boolean {
+  if (!role) return false;
+  if (role === ROOT_ROLE) return true;
+  return capabilities?.includes(cap) ?? false;
 }

@@ -72,12 +72,13 @@ export default async function Blog({
                   className="flex h-full flex-col overflow-hidden rounded-card border border-rule bg-surface transition hover:border-gold/50 motion-safe:hover:-translate-y-0.5"
                 >
                   {/* A cover is optional; without one the card keeps its
-                      shape rather than collapsing. */}
+                      shape rather than collapsing. Served by slug, not by
+                      the stored filename. */}
                   <div className="aspect-[16/9] bg-gold-wash">
                     {post.coverName && (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
-                        src={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/uploads/posts/${post.coverName}`}
+                        src={`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/site/posts/${post.slug}/cover`}
                         alt=""
                         className="size-full object-cover"
                         loading="lazy"

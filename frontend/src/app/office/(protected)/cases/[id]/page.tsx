@@ -13,6 +13,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { NotPermitted } from "@/components/office/PageHeading";
 import { officeFetch, type OfficeCaseFile } from "@/lib/office-data";
+import { can } from "@/lib/office-nav";
+import { getSessionUser } from "@/lib/session";
 import { formatDate, formatRupees } from "@/lib/portal-types";
 import { CaseForm } from "../CaseForm";
 import { AddHearing, Composer, DocumentRow, FeeEntry, HearingOutcome, UploadDocument } from "./CaseActions";
@@ -51,8 +53,21 @@ export default async function OfficeCase({ params }: { params: Promise<{ id: str
   const caseId = Number(id);
   if (!Number.isInteger(caseId) || caseId < 1) notFound();
 
-  const file = await officeFetch<OfficeCaseFile>(`/api/office/cases/${caseId}`);
+  const [file, user] = await Promise.all([
+    officeFetch<OfficeCaseFile>(`/api/office/cases/${caseId}`),
+    getSessionUser(),
+  ]);
   if (!file) return <NotPermitted />;
+
+  // What this role may do decides which controls appear at all. The API
+  // enforces the same capabilities; this only avoids offering a form whose
+  // submission was always going to be refused.
+  const mayEditHearings = can(user?.role, user?.capabilities, "hearings.edit");
+  const mayPostUpdates = can(user?.role, user?.capabilities, "updates.edit");
+  const mayReply = can(user?.role, user?.capabilities, "messages.reply");
+  const mayEditDocuments = can(user?.role, user?.capabilities, "documents.edit");
+  const mayEditMoney = can(user?.role, user?.capabilities, "money.edit");
+  const mayEditCase = can(user?.role, user?.capabilities, "cases.edit");
 
   const unanswered = file.messages.filter((m) => m.authorType === "client" && !m.answered).length;
 
@@ -110,12 +125,12 @@ export default async function OfficeCase({ params }: { params: Promise<{ id: str
                   ) : (
                     <p className="text-xs text-ink-soft">No outcome recorded.</p>
                   )}
-                  <HearingOutcome hearing={h} />
+                  {mayEditHearings && <HearingOutcome hearing={h} />}
                 </li>
               ))}
             </ul>
           )}
-          <AddHearing caseId={caseId} />
+          {mayEditHearings && <AddHearing caseId={caseId} />}
         </Section>
 
         <Section icon={<NotebookPen className="size-5 text-gold" />} title="Posted to the client">
@@ -130,7 +145,7 @@ export default async function OfficeCase({ params }: { params: Promise<{ id: str
               ))}
             </ul>
           )}
-          <Composer caseId={caseId} kind="update" />
+          {mayPostUpdates && <Composer caseId={caseId} kind="update" />}
         </Section>
 
         <Section
@@ -166,7 +181,7 @@ export default async function OfficeCase({ params }: { params: Promise<{ id: str
               ))}
             </ul>
           )}
-          <Composer caseId={caseId} kind="reply" />
+          {mayReply && <Composer caseId={caseId} kind="reply" />}
         </Section>
 
         <Section icon={<FileText className="size-5 text-gold" />} title="Documents">
@@ -183,12 +198,18 @@ export default async function OfficeCase({ params }: { params: Promise<{ id: str
                       {[d.origName, fileSize(d.sizeBytes)].filter(Boolean).join(" · ")}
                     </span>
                   </a>
-                  <DocumentRow document={d} />
+                  {mayEditDocuments ? (
+                    <DocumentRow document={d} />
+                  ) : (
+                    <span className="rounded-full bg-rule/60 px-2.5 py-1 text-xs font-semibold text-ink-soft">
+                      {d.clientVisible ? "Shared with the client" : "Not shared"}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
           )}
-          <UploadDocument caseId={caseId} />
+          {mayEditDocuments && <UploadDocument caseId={caseId} />}
         </Section>
 
         {file.fees.shown && (
@@ -209,18 +230,32 @@ export default async function OfficeCase({ params }: { params: Promise<{ id: str
                 </dd>
               </div>
             </dl>
-            <FeeEntry caseId={caseId} entries={file.fees.entries} />
+            {mayEditMoney ? (
+              <FeeEntry caseId={caseId} entries={file.fees.entries} />
+            ) : (
+              <ul className="divide-y divide-rule text-sm">
+                {file.fees.entries.map((f) => (
+                  <li key={f.id} className="flex gap-3 py-2">
+                    <span className="w-20 text-xs font-semibold text-gold uppercase">{f.kind}</span>
+                    <span className="w-32 font-medium text-ink">{formatRupees(f.amount)}</span>
+                    <span className="flex-1 text-ink-soft">{f.note}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Section>
         )}
 
-        <details className="rounded-card border border-rule bg-surface">
-          <summary className="cursor-pointer px-6 py-4 text-sm font-medium text-ink">
-            Edit the case details
-          </summary>
-          <div className="border-t border-rule p-2">
-            <CaseForm id={caseId} initial={file} />
-          </div>
-        </details>
+        {mayEditCase && (
+          <details className="rounded-card border border-rule bg-surface">
+            <summary className="cursor-pointer px-6 py-4 text-sm font-medium text-ink">
+              Edit the case details
+            </summary>
+            <div className="border-t border-rule p-2">
+              <CaseForm id={caseId} initial={file} />
+            </div>
+          </details>
+        )}
       </div>
     </>
   );
