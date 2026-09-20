@@ -24,6 +24,10 @@ backend/prisma/migrations/dev.db
 # material never belongs in the repository.
 backend/uploads/
 
+# Backups — the database and clients' documents. Never in the repository.
+backups/
+*.sql.gz
+
 # Logs
 *.log
 npm-debug.log*

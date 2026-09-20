@@ -397,6 +397,92 @@ are human:
   `TRUST_PROXY_HOPS` must match the deployment exactly — trusting
   `X-Forwarded-For` blindly would let a caller choose their own address.
 
+## Going live
+
+### The server refuses a development configuration
+
+`backend/src/config/production-checks.ts` runs before anything else at
+boot. With `NODE_ENV=production` it refuses to start on a short, guessable
+or placeholder `JWT_SECRET`, a `DATABASE_URL` still carrying the example
+password, a `CORS_ORIGIN` that allows `localhost` or plain `http://`, or a
+push endpoint that is not https. It reports **everything** wrong at once,
+with the command to generate a real secret, rather than one problem per
+restart.
+
+The checks are on configuration only — starting up never depends on
+another service being awake.
+
+> An earlier version of this also rejected any secret containing the word
+> "password", which threw out a perfectly good database password. A check
+> that blocks a correct deployment is worse than the mistake it guards
+> against, so weakness is judged by length and character variety, not
+> vocabulary.
+
+### Backups
+
+```bash
+cd backend && npm run backup -- /path/to/backups
+```
+
+```cron
+15 2 * * *  cd /path/to/backend && ./scripts/backup.sh /backups >> /var/log/chambers-backup.log 2>&1
+```
+
+It takes **both** halves — the database and the uploaded files — because
+either alone is useless: a dump restores a case file pointing at a document
+nobody can open, and the uploads are a folder of hex filenames with no idea
+what they are. It verifies the dump is readable and contains the tables it
+should before deleting anything old, keeps 30 days
+(`BACKUP_KEEP_DAYS`), and never prints the connection URL, because it runs
+from cron into a log file and that URL carries the password.
+
+**The restore is tested, not assumed.** The dump was restored into a
+scratch database and compared against the live one: same 23 tables, same
+row counts, content intact.
+
+### Deploying
+
+```bash
+# 1. Bring the code across, then install only what is needed to run
+npm ci --omit=dev
+
+# 2. Build
+npm run build:backend        # TypeScript -> backend/dist
+npm run build:frontend       # Next.js production build
+
+# 3. Apply migrations — deploy, never `migrate dev`, which can prompt
+cd backend && npx prisma migrate deploy && npx prisma generate
+
+# 4. Seed a first account, once, on an empty database
+npx prisma db seed           # admin / admin123 — change it immediately
+
+# 5. Start
+npm run start -w backend     # node dist/index.js
+npm run start -w frontend    # next start
+```
+
+Both processes need a supervisor that restarts them — systemd, pm2, or the
+Node app manager in a hosting panel — and a reverse proxy terminating TLS
+in front. Set `TRUST_PROXY_HOPS` to the number of proxies actually in
+front of the API: rate limits are keyed on the caller's address, and
+trusting `X-Forwarded-For` blindly lets a caller choose their own.
+
+`UPLOAD_DIR` should point **outside** the repository, so a redeployment
+cannot delete the clients' documents.
+
+### The one dependency advisory that remains
+
+`npm audit` reports a postcss advisory inside Next 15's own dependencies.
+Next pins `postcss` at exactly `8.4.31`, so no `overrides` entry can move
+it — the fix is Next 16, a major upgrade.
+
+It is left as it is deliberately. postcss here runs at **build time**, over
+this project's own CSS; the advisories require processing CSS an attacker
+controls, which never happens. The top-level `postcss` that Tailwind uses
+*is* overridden to a patched release, and the backend audits clean. Moving
+to Next 16 is worth doing as its own deliberate piece of work, not as a
+last-minute change to a working system.
+
 ## Conventions
 
 - **TypeScript everywhere**, `strict: true`. No `any` without a comment
@@ -429,7 +515,7 @@ are human:
 - [x] **Phase 5** — office core: clients, cases, hearings, money, documents, enquiries
 - [x] **Phase 6** — Site Settings, reviews, writing, accounts & roles,
       the communications diary, the money ledgers and the library editors
-- [ ] Phase 7 — hardening & deployment
+- [x] **Phase 7** — hardening & deployment
 
 ### The mobile app
 

@@ -16,7 +16,8 @@
     "portal:issue": "tsx scripts/issue-portal-login.ts",
     "staff:issue": "tsx scripts/issue-staff-login.ts",
     "demo:data": "tsx scripts/demo-case-data.ts",
-    "notify:hearings": "tsx scripts/send-hearing-reminders.ts"
+    "notify:hearings": "tsx scripts/send-hearing-reminders.ts",
+    "backup": "./scripts/backup.sh"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

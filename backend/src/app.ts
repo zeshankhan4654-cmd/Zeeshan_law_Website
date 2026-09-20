@@ -25,9 +25,29 @@ export function createApp(): Express {
   // caller pick their own address.
   app.set("trust proxy", env.trustProxyHops);
 
-  // Security headers, including HSTS — real TLS termination happens at the
-  // hosting platform, this just tells browsers to insist on it.
-  app.use(helmet());
+  /**
+   * Security headers, including HSTS — real TLS termination happens at the
+   * hosting platform; this just tells browsers to insist on it.
+   *
+   * `crossOriginResourcePolicy` is widened from helmet's `same-origin`
+   * default because the website and this API are separate origins, and the
+   * site legitimately embeds resources from here: blog covers in an `<img>`,
+   * voice notes in an `<audio>`. Left at the default, every one of those is
+   * refused by the browser with ERR_BLOCKED_BY_RESPONSE.NotSameOrigin — as
+   * a blog cover was, until this was tested in a real browser rather than
+   * with curl.
+   *
+   * It is safe here because CORP is not what protects anything: the
+   * protected routes require a session, so a stranger's page embedding a
+   * case document gets 401, and one trying to send credentials is refused
+   * by the CORS allow-list. The public routes serve material the chamber
+   * has deliberately published.
+   */
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    })
+  );
 
   app.use(
     cors({

@@ -1,7 +1,12 @@
 import os from "node:os";
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
+import { assertProductionReady } from "./config/production-checks.js";
 import { ensureUploadDirs } from "./lib/uploads.js";
+
+// Before anything else: a live server must not run on a development
+// configuration, and it should say so rather than start and be wrong.
+assertProductionReady();
 
 ensureUploadDirs();
 
