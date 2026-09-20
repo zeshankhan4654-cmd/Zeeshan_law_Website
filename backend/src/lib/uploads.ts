@@ -17,14 +17,13 @@ import { env } from "../config/env.js";
  *    outside the upload directory.
  */
 
-const VOICE_DIR = "voice";
-const DOCUMENT_DIR = "documents";
-
-export type UploadKind = "voice" | "document";
+export type UploadKind = "voice" | "document" | "post";
 
 const SUBDIR: Record<UploadKind, string> = {
-  voice: VOICE_DIR,
-  document: DOCUMENT_DIR,
+  voice: "voice",
+  document: "documents",
+  /** Blog cover images, which unlike the others are served publicly. */
+  post: "posts",
 };
 
 /** The upload root, as an absolute path. */
@@ -87,8 +86,29 @@ export function resolveStoredPath(kind: UploadKind, storedName: string): string 
   return resolved;
 }
 
+/**
+ * Images accepted as a blog cover. As with audio, the extension comes from
+ * this list rather than from the uploaded name.
+ */
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/avif": ".avif",
+  "image/gif": ".gif",
+};
+
+export function imageExtension(mimeType: string): string | null {
+  return IMAGE_EXTENSIONS[mimeType.toLowerCase().split(";")[0]?.trim() ?? ""] ?? null;
+}
+
 /** The MIME type to serve a stored file as, from its extension. */
 const CONTENT_TYPES: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".gif": "image/gif",
   ".m4a": "audio/mp4",
   ".aac": "audio/aac",
   ".mp3": "audio/mpeg",

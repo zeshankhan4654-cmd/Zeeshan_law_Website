@@ -253,6 +253,60 @@ All three were checked from both ends: the office sharing a document and
 the client then seeing it; the office ticking the fees box and the fees
 appearing; and the chamber's strategy note remaining absent throughout.
 
+### Site Settings, and the end of the empty contact details
+
+`/office/settings` is where the firm's real telephone number, email,
+WhatsApp number, map link and social accounts go. Only the keys the site
+reads may be written — an open key/value endpoint would let a typo sit in
+the table looking as though it worked — and a social or map field must be
+a whole `http(s)` URL, because a half-typed one renders as a broken icon on
+every page.
+
+Saving is verified end to end: a number entered here appeared on the public
+contact page, and the floating WhatsApp button and Facebook link appeared
+with it.
+
+### Reviews and writing
+
+Reviews are typed in from what clients actually wrote; the screen says so,
+and nothing is seeded. Articles carry a slug derived from the title, a
+cover photo, and a draft/published switch — unpublishing takes the article
+**and its cover** off the website, which is checked.
+
+A cover is served at `/api/site/posts/:slug/cover` rather than from the
+upload directory, so the folder's contents are not part of the site's
+public surface. (The Phase 3 blog card pointed at a `/uploads/...` path
+that was never served; that is fixed here.)
+
+### Accounts and roles
+
+Both can lock people out, so both carry rules that cannot be turned off:
+
+- The chamber must always keep at least one Principal. Demoting or deleting
+  the last one is refused, and nobody can delete their own account.
+- The Principal's own grants are not editable, because that role holds
+  every capability in application code — including ones added later.
+- A capability that the application does not define is dropped rather than
+  stored, so a typo cannot sit in `role_caps` looking like a grant.
+
+**A role change takes real effect**, which is tested rather than assumed:
+granting the Reader role `money.view` through the screen made fees appear
+on a case file for that user — while still offering them no way to record
+one.
+
+### Showing only what a role may do
+
+The office screens now hide controls the signed-in role cannot use, the way
+the mobile app already did. This was a real gap: a reader granted
+`money.view` was being shown the add-fee form, which the API would always
+have refused. Hiding it is a courtesy to the person, never the control —
+every write is still checked server-side.
+
+The same reasoning fixed the new-account form, which defaulted to the first
+role in the list and so made **Principal** the default. A clerk clicking
+briskly would have created an administrator without choosing to; the role
+must now be picked explicitly.
+
 ### The sidebar only lists screens that exist
 
 The original build's menu also had the communications diary, official fees,
@@ -348,7 +402,7 @@ are human:
 - [x] **Phase 3** — public marketing site
 - [x] **Phase 4** — client portal + login flows
 - [x] **Phase 5** — office core: clients, cases, hearings, money, documents, enquiries
-- [ ] Phase 6 — office content tools (blog, reviews, settings, roles)
+- [x] **Phase 6** — Site Settings, client reviews, writing, accounts & roles
 - [ ] Phase 7 — hardening & deployment
 
 ### The mobile app

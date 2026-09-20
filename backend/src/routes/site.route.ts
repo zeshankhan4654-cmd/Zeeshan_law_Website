@@ -1,5 +1,7 @@
+import fs from "node:fs";
 import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
+import { contentTypeFor, resolveStoredPath } from "../lib/uploads.js";
 import { prisma } from "../lib/prisma.js";
 import { countAction, secondsUntilAllowed } from "../lib/rate-limit.js";
 import { publicSettings } from "../lib/site-settings.js";
@@ -115,6 +117,37 @@ siteRouter.get(
       .catch(() => undefined);
 
     res.json(post);
+  })
+);
+
+/**
+ * An article's cover image.
+ *
+ * Served by the article's slug rather than by the stored filename, so the
+ * URL says what it is and the upload directory's contents are not part of
+ * the site's public surface. Only a published article's cover is served —
+ * a draft's image is not a way to read the draft, but it is still the
+ * chamber's unpublished work.
+ */
+siteRouter.get(
+  "/posts/:slug/cover",
+  asyncHandler(async (req, res) => {
+    const slug = String(req.params.slug ?? "").slice(0, 200);
+
+    const post = await prisma.post.findFirst({
+      where: { slug, published: true },
+      select: { coverName: true },
+    });
+    if (!post?.coverName) throw new ApiError(404, "No cover image.");
+
+    const filePath = resolveStoredPath("post", post.coverName);
+    if (!filePath || !fs.existsSync(filePath)) throw new ApiError(404, "No cover image.");
+
+    // A cover changes only when the article is edited, and the URL changes
+    // with the slug, so it is safe to let a browser keep it for a while.
+    res.set("Cache-Control", "public, max-age=3600");
+    res.type(contentTypeFor(post.coverName));
+    res.sendFile(filePath);
   })
 );
 
