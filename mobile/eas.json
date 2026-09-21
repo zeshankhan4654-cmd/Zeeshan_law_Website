@@ -4,30 +4,39 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
+    "//": "Three ways to build. Pick one with --profile <name>.",
+
+    "apk": {
+      "//": "An installable Android file, pointing at the live server. This is the one to build once the API is deployed: it works anywhere, on mobile data, like any normal app.",
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "REPLACE_ME_RUN__npm_run_lan-ip"
-      }
-    },
-    "production": {
-      "distribution": "store",
-      "android": {
-        "buildType": "app-bundle"
-      },
+      "android": { "buildType": "apk" },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.arbitratorandlaw.com"
       }
+    },
+
+    "apk-local": {
+      "//": "The same, but pointing at a computer on your own wifi - for testing before the server is live. Run `npm run lan-ip` and put what it prints below.",
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://REPLACE-WITH-YOUR-COMPUTERS-ADDRESS:4000"
+      }
+    },
+
+    "production": {
+      "//": "For the Play Store. Google requires .aab, not .apk.",
+      "distribution": "store",
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.arbitratorandlaw.com"
+      }
+    },
+
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
     }
   },
   "submit": {
