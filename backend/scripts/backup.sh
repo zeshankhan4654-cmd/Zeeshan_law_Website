@@ -64,6 +64,20 @@ mkdir -p "$DEST"
 DB_FILE="$DEST/chambers-db-$STAMP.sql.gz"
 FILES_FILE="$DEST/chambers-uploads-$STAMP.tar.gz"
 
+if ! command -v pg_dump >/dev/null 2>&1; then
+  cat >&2 <<'MISSING'
+pg_dump is not on PATH, so the database cannot be backed up.
+
+It ships with PostgreSQL and is usually installed but outside the default
+PATH on a hosting panel. Find it and put it on PATH, for example:
+
+    export PATH="/usr/pgsql-16/bin:$PATH"
+
+Other common locations: /usr/bin, /usr/local/pgsql/bin, /opt/pgsql/bin.
+MISSING
+  exit 1
+fi
+
 echo "Backing up the database…"
 # --clean --if-exists so the dump can be restored over an existing database.
 pg_dump --clean --if-exists --no-owner --no-privileges "${SCHEMA_FLAG[@]}" "$PG_URL" | gzip -9 > "$DB_FILE"
@@ -92,15 +106,27 @@ fi
 schema_name="${PG_SCHEMA:-public}"
 tables_in_dump="$(gzip -dc "$DB_FILE" | grep -o "CREATE TABLE ${schema_name}\.[a-z_]*" || true)"
 
-for table in users clients cases case_messages documents; do
-  case "$tables_in_dump" in
-    *"${schema_name}.${table}"*) ;;
-    *)
-      echo "The dump is missing the '$table' table. Not deleting anything." >&2
-      exit 1
-      ;;
-  esac
-done
+if [ -z "$tables_in_dump" ]; then
+  # A database with no tables at all has not been migrated yet — this is the
+  # first deployment, running before the migrations, and there is nothing to
+  # protect. Demanding the tables here stopped a first deployment at its
+  # very first step, which is the one moment the backup exists to make safe.
+  #
+  # An established database that dumped no tables would be a different
+  # matter, but pg_dump cannot fail silently into this branch: it is piped
+  # under `set -o pipefail`, so a failure ends the script above.
+  echo "  (no tables yet — a database this new has nothing to lose)"
+else
+  for table in users clients cases case_messages documents; do
+    case "$tables_in_dump" in
+      *"${schema_name}.${table}"*) ;;
+      *)
+        echo "The dump is missing the '$table' table. Not deleting anything." >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
 
 echo "Removing backups older than $KEEP_DAYS days…"
 find "$DEST" -name 'chambers-*' -type f -mtime "+$KEEP_DAYS" -delete
