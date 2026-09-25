@@ -17,6 +17,12 @@ const schema = Joi.object({
   // sends no Origin header and is not subject to CORS at all.
   CORS_ORIGIN: Joi.string().required(),
 
+  // Whether an advocate who finds the site may register a chamber without
+  // being invited. "off" closes the door and changes nothing else: chambers
+  // that already exist carry on, and the platform admin can still create
+  // one. It is a decision about who arrives, not about how anything works.
+  PUBLIC_SIGNUP: Joi.string().valid("on", "off").default("on"),
+
   // Signs and verifies the session cookie. Generate a real value with:
   //   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
   JWT_SECRET: Joi.string().min(32).required(),
@@ -80,6 +86,7 @@ export const env = {
     transport: value.PUSH_TRANSPORT as "expo" | "log" | "off",
   },
   platformFirmSlug: value.PLATFORM_FIRM_SLUG as string,
+  publicSignup: value.PUBLIC_SIGNUP === "on",
   login: {
     maxAttempts: value.LOGIN_MAX_ATTEMPTS as number,
     lockoutMinutes: value.LOGIN_LOCKOUT_MINUTES as number,

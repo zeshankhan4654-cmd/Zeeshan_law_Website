@@ -125,6 +125,9 @@ const PORTAL_CASES = [
 export function demoResponse(path: string): unknown {
   const p = path.split("?")[0] ?? path;
 
+  // The demonstration is a shop window, so it shows registration open.
+  if (p === "/api/site/settings") return { "signup.public": "on" };
+
   if (p === "/api/library/counts") return { judgments: 0, research: RESEARCH.length, media: 0 };
 
   if (p === "/api/library/research")

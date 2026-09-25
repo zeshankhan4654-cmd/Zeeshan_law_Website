@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Logo } from "@/components/site/Logo";
 import { PLATFORM_NAME, platformTitle } from "@/lib/platform-brand";
 import { getSessionUser } from "@/lib/session";
+import { getSettings } from "@/lib/site";
 import { SignupForm } from "./SignupForm";
 
 export const metadata = {
@@ -25,6 +26,13 @@ export default async function Signup() {
   const session = await getSessionUser();
   if (session) redirect("/office");
 
+  // The API refuses registration when this is off; the page says so rather
+  // than presenting a form that cannot succeed. Someone arrives here from a
+  // bookmark or a link a colleague sent months ago, and deserves an answer
+  // instead of a rejected submission.
+  const settings = await getSettings();
+  const open = settings["signup.public"] !== "off";
+
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       <div className="flex items-center justify-center bg-ground px-6 py-16">
@@ -43,7 +51,29 @@ export default async function Signup() {
             <h1 className="font-display text-2xl text-ink">Register your chamber</h1>
           </div>
 
-          <SignupForm />
+          {open ? (
+            <SignupForm />
+          ) : (
+            <div className="space-y-3 rounded-md border border-rule bg-gold-wash px-5 py-5">
+              <p className="text-sm font-semibold text-ink">
+                Not taking new chambers at the moment
+              </p>
+              <p className="text-sm leading-6 text-ink-soft">
+                Registration is closed for now. It is not a judgement on anyone who
+                arrives here — the platform is young and is being opened gradually.
+              </p>
+              <p className="text-sm leading-6 text-ink-soft">
+                Write to the chamber if you would like one, and you will be told when
+                it opens.
+              </p>
+              <Link
+                href="/contact"
+                className="inline-block text-sm font-semibold text-gold hover:underline"
+              >
+                How to write to us
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 
@@ -76,7 +106,9 @@ export default async function Signup() {
               title: "Start the same afternoon",
               body: "Nothing waits on us approving you. Register, and the diary is there.",
             },
-          ].map((f) => (
+            // Untrue while registration is closed, and a promise a page
+            // should not make when the form beside it cannot be filled in.
+          ].filter((f) => open || f.title !== "Start the same afternoon").map((f) => (
             <li key={f.title} className="flex gap-4">
               <span className="grid size-10 shrink-0 place-items-center rounded-md bg-gold/15 text-gold-bright">
                 <f.icon className="size-5" strokeWidth={1.6} />

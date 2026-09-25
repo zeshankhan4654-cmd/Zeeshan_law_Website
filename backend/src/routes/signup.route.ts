@@ -8,6 +8,7 @@ import { hashPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
 import { countAction, secondsUntilAllowed } from "../lib/rate-limit.js";
 import { forFirm } from "../lib/tenant.js";
+import { env } from "../config/env.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate } from "../middleware/validate.js";
 import { signupSchema, type SignupInput } from "../validation/auth.schema.js";
@@ -32,6 +33,28 @@ import { signupSchema, type SignupInput } from "../validation/auth.schema.js";
  * and what anything published in a chamber's name will later depend on.
  */
 export const signupRouter = Router();
+
+/**
+ * The door, when the platform is not taking new chambers.
+ *
+ * On the router rather than on the one handler below, so a second way in
+ * added later cannot be left unguarded by forgetting it here.
+ *
+ * 403 and not 404: the route exists and the refusal is a decision, which
+ * is worth saying plainly to an advocate who may well be welcome later.
+ */
+signupRouter.use((_req, _res, next) => {
+  if (!env.publicSignup) {
+    next(
+      new ApiError(
+        403,
+        "This platform is not taking new chambers at the moment. Please write to us if you would like one."
+      )
+    );
+    return;
+  }
+  next();
+});
 
 /**
  * New chambers from one address before a cool-off.

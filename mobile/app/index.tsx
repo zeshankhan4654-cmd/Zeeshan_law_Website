@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { BookOpen, Building2, Gavel, LogIn, Scale, UserCircle, Video } from "lucide-react-native";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { usePublicSignup } from "@/lib/platform-settings";
 import { useLibraryCounts } from "@/lib/library";
 import { useSession } from "@/lib/session";
 
@@ -53,6 +54,7 @@ function Tile({
 const APP_NAME = Constants.expoConfig?.name ?? "Chambers";
 
 export default function Home() {
+  const publicSignup = usePublicSignup();
   const router = useRouter();
   const { data: counts } = useLibraryCounts();
   const session = useSession();
@@ -123,14 +125,17 @@ export default function Home() {
               onPress={() => router.push("/sign-in")}
             />
             {/* The reason an advocate who found this in the store would
-                keep it: they can have their own chamber in a minute. */}
-            <Tile
-              icon={<Building2 size={20} color="#9a7622" />}
-              title="Register your chamber"
-              subtitle="Your own diary, clients and files — private to you"
-              disabled={session.status === "loading"}
-              onPress={() => router.push("/sign-up")}
-            />
+                keep it: they can have their own chamber in a minute —
+                while the platform is taking them. */}
+            {publicSignup && (
+              <Tile
+                icon={<Building2 size={20} color="#9a7622" />}
+                title="Register your chamber"
+                subtitle="Your own diary, clients and files — private to you"
+                disabled={session.status === "loading"}
+                onPress={() => router.push("/sign-up")}
+              />
+            )}
           </>
         )}
       </View>

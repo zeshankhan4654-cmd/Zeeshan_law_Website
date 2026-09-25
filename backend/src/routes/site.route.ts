@@ -6,6 +6,7 @@ import { platformDb, platformFirmId } from "../lib/platform.js";
 import { prisma } from "../lib/prisma.js";
 import { countAction, secondsUntilAllowed } from "../lib/rate-limit.js";
 import { publicSettings } from "../lib/site-settings.js";
+import { env } from "../config/env.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
 import {
@@ -36,7 +37,14 @@ const ENQUIRY_COOLOFF_MINUTES = 60;
 siteRouter.get(
   "/settings",
   asyncHandler(async (_req, res) => {
-    res.json(await publicSettings(await platformFirmId()));
+    // The signup flag rides along with the chamber's own settings because
+    // it answers the same question every public page asks on load: what
+    // should this page offer? A page that offers a door the API will slam
+    // is worse than one that never showed it.
+    res.json({
+      ...(await publicSettings(await platformFirmId())),
+      "signup.public": env.publicSignup ? "on" : "off",
+    });
   })
 );
 

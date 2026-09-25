@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { usePublicSignup } from "@/lib/platform-settings";
 import { DEMO } from "@/lib/demo";
 import { useSession, type Audience } from "@/lib/session";
 
@@ -51,6 +52,7 @@ function Field({
 }
 
 export default function SignIn() {
+  const publicSignup = usePublicSignup();
   const router = useRouter();
   const { signIn } = useSession();
 
@@ -279,7 +281,10 @@ export default function SignIn() {
         )}
 
         {audience === "staff" ? (
-          <View className="gap-3 rounded-card border border-rule bg-surface p-4">
+          // Offered only while the platform is taking new chambers. A
+          // client never reaches this branch at all.
+          publicSignup ? (
+            <View className="gap-3 rounded-card border border-rule bg-surface p-4">
             <Text className="text-sm font-semibold text-ink">No chamber yet?</Text>
             <Text className="text-sm leading-6 text-ink-soft">
               Any advocate can register one and start keeping their diary the same
@@ -291,7 +296,8 @@ export default function SignIn() {
                 <Text className="text-base font-semibold text-gold">Register my chamber</Text>
               </Pressable>
             </Link>
-          </View>
+            </View>
+          ) : null
         ) : (
           <View className="flex-row gap-2.5 px-1">
             <ShieldCheck size={16} color="#9a7622" />

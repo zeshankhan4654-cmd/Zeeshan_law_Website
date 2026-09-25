@@ -10,7 +10,7 @@ import { Field } from "@/components/ui/Field";
 import { ApiError } from "@/lib/api";
 import { useLogin } from "@/lib/use-auth";
 
-export function LoginForm() {
+export function LoginForm({ publicSignup }: { publicSignup: boolean }) {
   const router = useRouter();
   const login = useLogin();
   const [email, setEmail] = useState("");
@@ -75,13 +75,15 @@ export function LoginForm() {
 
         <div className="flex flex-col gap-2 text-center text-xs text-ink-soft">
           <p>Clients sign in through the link their advocate sent them, not here.</p>
-          <p>
-            No chamber yet?{" "}
-            <Link href="/signup" className="font-semibold text-gold hover:underline">
-              Register yours
-            </Link>
-            .
-          </p>
+          {publicSignup && (
+            <p>
+              No chamber yet?{" "}
+              <Link href="/signup" className="font-semibold text-gold hover:underline">
+                Register yours
+              </Link>
+              .
+            </p>
+          )}
         </div>
       </CardBody>
     </Card>
