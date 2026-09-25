@@ -880,6 +880,16 @@ Add the daily reminder sweep to cron:
 30 16 * * *  cd /path/to/backend && /usr/bin/npm run notify:hearings
 ```
 
+On a hosting panel that manages Node itself (cPanel's Node.js Selector and
+the like), `npm` is inside the environment the panel made and is not on
+cron's PATH, so that line finds nothing and the job fails every day in
+silence. Activate the environment first — the panel shows the exact line,
+and the Node version is part of the path:
+
+```cron
+30 16 * * *  . /home/<user>/nodevenv/<app root>/<version>/bin/activate && cd /path/to/backend && npm run notify:hearings
+```
+
 #### The app links
 
 `frontend/public/.well-known/` holds the two files Android and iOS read
