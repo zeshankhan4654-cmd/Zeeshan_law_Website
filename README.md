@@ -64,8 +64,10 @@ npm install                       # installs both workspaces from the root
 cd backend
 npx prisma migrate dev            # creates all 21 tables
 npx prisma db seed                # seeds roles, capabilities, and a first
-                                   # account: admin / admin123 — the app
-                                   # forces a password change on first use
+                                   # account. It PRINTS that account's
+                                   # password once and keeps it nowhere;
+                                   # copy it. The app forces a change on
+                                   # first use.
 cd ..
 npm run dev:backend               # http://localhost:4000
 
@@ -81,7 +83,7 @@ Try the API directly:
 ```bash
 curl -c /tmp/c.txt -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"THE-ONE-THE-SEED-PRINTED"}'
 
 curl -b /tmp/c.txt http://localhost:4000/api/auth/me
 ```
@@ -861,6 +863,16 @@ npm run platform:grant -- --list            # check
 Then sign in as the seeded account and change its password. The API will
 not let it do anything else until you have — and its address is a
 `.invalid` placeholder, so change that too, from **My Account**.
+
+**The seed prints that password once and stores only its hash.** It used to
+be a fixed word written in `prisma/seed.ts`, which is safe only while
+nobody outside can read the file. This repository is public, so it was not:
+the account exists from the moment the database is seeded until somebody
+signs in and changes the password, and the one thing `mustChangePassword`
+still permits is that change. A starting password anyone can look up hands
+that window, and the chamber's admin account with it, to whoever reaches
+the deployment first. Copy it out of the deploy output; if you lose it
+before signing in, delete the row and seed again.
 
 Add the daily reminder sweep to cron:
 

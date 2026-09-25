@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
 import { seedChamberRoles } from "../src/lib/default-roles.js";
@@ -13,6 +14,33 @@ const prisma = new PrismaClient();
  * when it is created, and this seeds the first one.
  */
 const FIRM_SLUG = process.env.PLATFORM_FIRM_SLUG ?? "arbitrator-law";
+
+/**
+ * The first account's starting password, made fresh every time.
+ *
+ * This used to be a fixed word written in this file, which is safe only
+ * while nobody outside can read the file. This repository is public, so it
+ * was not: the account exists from the moment the database is seeded until
+ * somebody signs in and changes the password, and the one thing
+ * `mustChangePassword` still permits is that change. A starting password
+ * anyone can look up hands that window — and with it the chamber's admin
+ * account — to whoever reaches the deployment first.
+ *
+ * It is printed once, to whoever ran the deployment, and kept nowhere but
+ * as a hash. Lose it before signing in and the answer is to delete the row
+ * and seed again, which is the correct trade.
+ *
+ * The alphabet leaves out the characters that are read wrongly off a
+ * terminal — no O/0, no l/1/I — because this gets typed by hand, once,
+ * usually on a phone.
+ */
+const SAFE_CHARS = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function startingPassword(): string {
+  let out = "";
+  for (let i = 0; i < 20; i += 1) out += SAFE_CHARS[randomInt(SAFE_CHARS.length)];
+  return out.replace(/(.{5})(?=.)/g, "$1-");
+}
 
 async function main() {
   const firm = await prisma.firm.upsert({
@@ -36,20 +64,34 @@ async function main() {
     // a real address and can never collide with one. It signs in, and the
     // office tells its holder to replace it.
     const email = `admin@${FIRM_SLUG}.invalid`;
+    const password = startingPassword();
     await prisma.user.create({
       data: {
         firmId,
         username: "admin",
         email,
-        passwordHash: await hashPassword("admin123"),
+        passwordHash: await hashPassword(password),
         fullName: "Principal",
         role: "admin",
         mustChangePassword: true,
       },
     });
+    // Loud, because it is shown once and a deployment prints a great deal.
     console.log(
-      `Seeded a first account: sign in with "${email}", password "admin123" — ` +
-        "change both on first sign-in."
+      [
+        "",
+        "  ┌─────────────────────────────────────────────────────────────┐",
+        "  │  A first account has been made. This is shown ONCE.         │",
+        "  └─────────────────────────────────────────────────────────────┘",
+        "",
+        `      sign in     ${email}`,
+        `      password    ${password}`,
+        "",
+        "  Sign in and change both now. The account can do nothing else",
+        "  until the password is changed, and that address is a reserved",
+        "  placeholder that can never receive mail.",
+        "",
+      ].join("\n")
     );
   } else {
     console.log("An admin account already exists; skipped seeding one.");
