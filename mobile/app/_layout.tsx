@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { BottomNav } from "@/components/BottomNav";
 import { DEMO } from "@/lib/demo";
 import { useChamberLink } from "@/lib/chamber-link";
 import { useNotificationRouting } from "@/lib/notification-routing";
@@ -33,26 +34,31 @@ function AppStack() {
         </View>
       )}
 
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: "#17140f" },
-          headerTintColor: "#ffffff",
-          headerTitleStyle: { fontWeight: "600", fontSize: 16 },
-          contentStyle: { backgroundColor: "#faf8f5" },
-        }}
-      >
-        <Stack.Screen name="index" options={{ title: APP_NAME }} />
-        <Stack.Screen name="library/index" options={{ title: "Legal Research" }} />
-        <Stack.Screen name="library/judgments" options={{ title: "Judgments" }} />
-        <Stack.Screen name="library/[id]" options={{ title: "", headerBackTitle: "Library" }} />
-        <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
-        <Stack.Screen name="sign-up" options={{ title: "Register your chamber" }} />
-        <Stack.Screen name="account" options={{ title: "Your account" }} />
-        <Stack.Screen name="change-password" options={{ title: "Password" }} />
-        {/* Each tier carries its own header, from its own gated layout. */}
-        <Stack.Screen name="(client)" options={{ headerShown: false }} />
-        <Stack.Screen name="(staff)" options={{ headerShown: false }} />
-      </Stack>
+      {/* The Stack takes the room the bar does not. */}
+      <View className="flex-1">
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: "#17140f" },
+            headerTintColor: "#ffffff",
+            headerTitleStyle: { fontWeight: "600", fontSize: 16 },
+            contentStyle: { backgroundColor: "#faf8f5" },
+          }}
+        >
+          <Stack.Screen name="index" options={{ title: APP_NAME }} />
+          <Stack.Screen name="library/index" options={{ title: "Legal Research" }} />
+          <Stack.Screen name="library/judgments" options={{ title: "Judgments" }} />
+          <Stack.Screen name="library/[id]" options={{ title: "", headerBackTitle: "Library" }} />
+          <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
+          <Stack.Screen name="sign-up" options={{ title: "Register your chamber" }} />
+          <Stack.Screen name="account" options={{ title: "Your account" }} />
+          <Stack.Screen name="change-password" options={{ title: "Password" }} />
+          {/* Each tier carries its own header, from its own gated layout. */}
+          <Stack.Screen name="(client)" options={{ headerShown: false }} />
+          <Stack.Screen name="(staff)" options={{ headerShown: false }} />
+        </Stack>
+      </View>
+
+      <BottomNav />
     </>
   );
 }

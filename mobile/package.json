@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lan-ip": "node scripts/lan-ip.js",
-    "build:apk": "eas build --platform android --profile preview",
+    "build:apk": "eas build --platform android --profile apk",
     "build:aab": "eas build --platform android --profile production",
     "build:ios": "eas build --platform ios --profile production"
   },
