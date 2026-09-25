@@ -80,6 +80,15 @@ module.exports = {
   },
   web: {
     bundler: "metro",
+    /**
+     * One page; the router handles the rest in the browser.
+     *
+     * "static" writes a page per route and is better for a plain web host
+     * — a refresh on /sign-in then works. It is set to "single" here
+     * because the demonstration is served from a host that serves one
+     * page, and every screen is reached by tapping rather than by URL.
+     * Switch it back for a normal deployment.
+     */
     output: "single",
     favicon: "./assets/favicon.png",
   },

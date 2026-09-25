@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { DEMO } from "@/lib/demo";
 import { useSession, type Audience } from "@/lib/session";
 
 const TABS: { key: Audience; label: string; hint: string }[] = [
@@ -245,6 +246,37 @@ export default function SignIn() {
             </Text>
           </Pressable>
         </View>
+
+        {DEMO && (
+          <View className="gap-3 rounded-card border border-gold/40 bg-gold-wash p-4">
+            <Text className="text-sm font-semibold text-ink">This is the demonstration</Text>
+            <Text className="text-sm leading-6 text-ink-soft">
+              There are no real accounts, so nothing here needs a password. Tap to see
+              either side of the app.
+            </Text>
+            <Pressable
+              onPress={() => {
+                setAudience("staff");
+                setEmail("you@example.com");
+                setPassword("demonstration");
+              }}
+              className="items-center rounded-card bg-ink py-3 active:bg-ink-soft"
+            >
+              <Text className="text-base font-semibold text-white">Fill in an advocate</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setAudience("client");
+                setChamber("demo-chamber");
+                setUsername("fazal.rehman");
+                setPassword("demonstration");
+              }}
+              className="items-center rounded-card border border-gold py-3"
+            >
+              <Text className="text-base font-semibold text-gold">Fill in a client</Text>
+            </Pressable>
+          </View>
+        )}
 
         {audience === "staff" ? (
           <View className="gap-3 rounded-card border border-rule bg-surface p-4">

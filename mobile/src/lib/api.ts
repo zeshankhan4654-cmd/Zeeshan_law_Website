@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { DEMO, demoResponse } from "./demo";
 
 /**
  * Where the API lives.
@@ -39,6 +40,15 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit & { token?: string | null }
 ): Promise<T> {
+  // The demonstration build answers from bundled data instead of the
+  // network, so the whole app can be walked through before any server
+  // exists. DEMO is fixed at build time and cannot be turned on at
+  // runtime — see lib/demo.ts for why that matters.
+  if (DEMO) {
+    await new Promise((r) => setTimeout(r, 120));   // so loading states are seen
+    return demoResponse(path) as T;
+  }
+
   const { token, ...rest } = init ?? {};
 
   const res = await fetch(`${API_URL}${path}`, {

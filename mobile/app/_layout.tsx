@@ -1,7 +1,9 @@
 import Constants from "expo-constants";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { DEMO } from "@/lib/demo";
 import { useChamberLink } from "@/lib/chamber-link";
 import { useNotificationRouting } from "@/lib/notification-routing";
 import { QueryProvider } from "@/lib/query-provider";
@@ -19,6 +21,18 @@ function AppStack() {
   return (
     <>
       <StatusBar style="light" />
+
+      {/* Said plainly, on every screen, for as long as the demonstration
+          lasts. Somebody shown this must never take it for their own data. */}
+      {DEMO && (
+        <View className="bg-gold-wash px-4 py-2">
+          <Text className="text-center text-xs leading-4 text-ink">
+            Demonstration — sample data, nothing is saved. The real Lawyer360 keeps your
+            chamber&rsquo;s own records on your own server.
+          </Text>
+        </View>
+      )}
+
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: "#17140f" },
