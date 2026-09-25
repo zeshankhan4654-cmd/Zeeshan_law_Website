@@ -112,6 +112,26 @@ module.exports = {
       },
     ],
   ],
+  extra: {
+    eas: {
+      /**
+       * Filled in the first time `eas build` runs.
+       *
+       * `eas init` writes this itself into an app.json, but cannot write
+       * into a config file that is JavaScript, so it prints the id and
+       * leaves it to you. This is where it goes — either set
+       * EAS_PROJECT_ID in the environment, or replace this line with the
+       * id in quotes.
+       *
+       * It is not only a build setting. The app reads it at runtime to
+       * register the device for hearing reminders; see
+       * src/lib/push-registration.ts, which falls back to the id baked
+       * into an EAS build when this is empty.
+       */
+      projectId: process.env.EAS_PROJECT_ID,
+    },
+  },
+
   experiments: {
     typedRoutes: true,
   },
