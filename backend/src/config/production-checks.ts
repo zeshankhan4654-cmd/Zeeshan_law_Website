@@ -29,9 +29,23 @@ function looksLikePlaceholder(value: string): boolean {
   return PLACEHOLDERS.some((p) => lower.includes(p.toLowerCase()));
 }
 
-/** Weak in the way a hand-typed secret is weak: too few distinct characters. */
+/**
+ * Weak in the way a hand-typed secret is weak: too few distinct characters.
+ *
+ * The threshold has to account for what a correct secret looks like. The
+ * command this project tells people to run prints 96 hexadecimal
+ * characters, drawn from an alphabet of exactly 16, so demanding 16
+ * distinct characters demanded a *perfect* set — and a random draw misses
+ * at least one digit about 3% of the time. Roughly one deployment in
+ * thirty was told its properly generated secret "does not look random",
+ * which is the same mistake as the vocabulary check above, rediscovered
+ * from the other end.
+ *
+ * Twelve leaves margin: missing five of sixteen digits across 96 draws
+ * does not happen, while a repeated word or a name still falls short.
+ */
 function tooLittleVariety(value: string): boolean {
-  return new Set(value).size < 16;
+  return new Set(value).size < 12;
 }
 
 export function productionChecks(): string[] {
