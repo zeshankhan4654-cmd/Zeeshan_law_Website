@@ -275,6 +275,17 @@ mean nobody could start on the day they joined — but it is what the
 platform admin acts on, and what anything published in a chamber's name
 will depend on.
 
+**`PUBLIC_SIGNUP=off` closes the door entirely.** A deployment that is one
+chamber's office rather than a platform — or one whose owner would rather
+open gradually — sets it and nothing else changes: existing chambers carry
+on, staff and clients are issued as before, and the platform admin can
+still create a chamber by hand. The guard sits on the signup router rather
+than its one handler, so another way in added later cannot be left open by
+forgetting it, and it answers 403 rather than 404 because the refusal is a
+decision worth stating to an advocate who may be welcome later. The website
+and the app read the flag from `/api/site/settings` and stop offering what
+the API would refuse. The default is on.
+
 The rate limit on sign-up is loose on purpose (ten per address per six
 hours). Mobile carriers here put very large numbers of people behind one
 address and a courts building shares one, so a tight limit would turn away
