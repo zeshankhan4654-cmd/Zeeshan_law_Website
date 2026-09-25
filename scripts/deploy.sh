@@ -62,6 +62,28 @@ say "Backing up the database before touching it"
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
+# A hosting panel's Node application manager puts a symlink called
+# node_modules inside each application folder, pointing into the environment
+# it manages, and creates it when the application is registered. `npm ci`
+# wants a real directory there and stops with EEXIST before installing
+# anything.
+#
+# Removing the link is right rather than merely expedient: it points one
+# application at one private install, and this project installs once at the
+# top and shares that between both halves. Node still finds everything —
+# it looks in the application folder, then upward, and upward is where the
+# install is.
+#
+# `rm` on a symlink removes the link and never what it points at. The loop
+# runs on every deployment because pressing the panel's "Run NPM Install"
+# button puts the link back.
+for workspace in backend frontend; do
+  if [ -L "$workspace/node_modules" ]; then
+    say "Removing the hosting panel's node_modules link in $workspace/"
+    rm -f "$workspace/node_modules"
+  fi
+done
+
 say "Installing"
 #
 # Everything, including devDependencies — deliberately, and not pruned
