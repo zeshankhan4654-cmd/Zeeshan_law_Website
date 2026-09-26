@@ -3,9 +3,26 @@
  * on which profile is being built — see `usesCleartextTraffic` below.
  */
 
-// EAS sets this during a cloud build; it is undefined when running locally.
-const profile = process.env.EAS_BUILD_PROFILE;
-const isProduction = profile === "production";
+/**
+ * Whether this build has to be allowed to speak plain HTTP.
+ *
+ * Android has refused it by default since Android 9, and a build talking to
+ * a laptop on the office wifi (http://192.168.x.x) needs the exception or
+ * every request fails with no useful error.
+ *
+ * Derived from the address the build will actually call, not from the
+ * profile's name. Naming was the obvious way and it was wrong: it asked
+ * whether the profile was called "production", so `apk` — the profile that
+ * points at the live HTTPS API and goes onto real phones — shipped with the
+ * exception enabled. A profile can be renamed or added; what decides
+ * whether cleartext is needed is whether the API is reached over http, and
+ * now that is what is asked.
+ *
+ * Unset means a developer running the dev server over the local network,
+ * which does need it.
+ */
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
+const needsCleartext = apiUrl === "" || apiUrl.startsWith("http://");
 
 /**
  * The domain the advocates' client links live on.
@@ -59,16 +76,10 @@ module.exports = {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#17140F",
     },
-    /**
-     * Android has refused plain-HTTP traffic by default since Android 9.
-     * A test build talking to a laptop on the office wifi (http://192.168.x.x)
-     * needs this allowed, or every request fails with no useful error.
-     *
-     * It is derived from the build profile rather than hardcoded, so a
-     * production build cannot ship with cleartext enabled even if somebody
-     * forgets — production must reach the API over HTTPS.
-     */
-    usesCleartextTraffic: !isProduction,
+    // See needsCleartext above: true only when this build's own API address
+    // is plain http, so a build aimed at the live server cannot ship with
+    // the exception however the profile is named.
+    usesCleartextTraffic: needsCleartext,
     intentFilters: [
       {
         action: "VIEW",
