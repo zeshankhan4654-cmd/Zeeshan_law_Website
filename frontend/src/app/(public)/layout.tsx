@@ -142,6 +142,14 @@ export default async function PublicLayout({ children }: { children: React.React
               &copy; {new Date().getFullYear()} The Arbitrator &amp; Law Associates. Material on
               this site is general information, not legal advice on your matter.
             </p>
+            {/* Both app stores require this at a public address before they
+                will list the mobile app, and it belongs in the footer of a
+                site that holds privileged material regardless. */}
+            <p>
+              <Link href="/privacy" className="hover:text-gold-bright">
+                What this chamber records
+              </Link>
+            </p>
             <p>
               Designed and Maintained by{" "}
               <a
