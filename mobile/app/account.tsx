@@ -2,17 +2,19 @@ import { useRouter } from "expo-router";
 import {
   AlertTriangle,
   Banknote,
+  Globe,
   BookOpen,
   MessageSquare,
   Briefcase,
   CalendarDays,
   FolderOpen,
   KeyRound,
+  Users,
   LogOut,
   User,
 } from "lucide-react-native";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
-import { useSession } from "@/lib/session";
+import { can, useSession } from "@/lib/session";
 
 function Row({
   icon,
@@ -188,6 +190,24 @@ export default function AccountScreen() {
             subtitle="Judgments, writing and recordings — yours, your site, or shared"
             onPress={() => router.push("/chamber-library")}
           />
+
+          {can(session.account, "users.manage") && (
+            <Row
+              icon={<Users size={20} color="#9a7622" />}
+              title="Your colleagues"
+              subtitle="Who works here, and what each of them may do"
+              onPress={() => router.push("/chamber/staff")}
+            />
+          )}
+
+          {can(session.account, "settings.edit") && (
+            <Row
+              icon={<Globe size={20} color="#9a7622" />}
+              title="What the site says"
+              subtitle="The telephone number and address your clients see"
+              onPress={() => router.push("/chamber/settings")}
+            />
+          )}
         </View>
       )}
 

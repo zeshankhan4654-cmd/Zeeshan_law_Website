@@ -153,6 +153,46 @@ export function demoResponse(path: string, method = "GET"): unknown {
     };
   }
 
+  // --- running the chamber -------------------------------------------------
+  if (p === "/api/office/users")
+    return {
+      items: [
+        { id: 1, username: "demo.advocate", email: "you@example.com", fullName: "Demo Advocate", role: "admin", mustChangePassword: false, createdAt: "2026-01-04T00:00:00.000Z" },
+        { id: 2, username: "junior", email: "junior@example.com", fullName: "Junior Associate", role: "associate", mustChangePassword: true, createdAt: "2026-06-18T00:00:00.000Z" },
+      ],
+      roles: [
+        { roleKey: "admin", label: "Principal" },
+        { roleKey: "editor", label: "Office manager" },
+        { roleKey: "associate", label: "Associate" },
+      ],
+    };
+
+  if (p.startsWith("/api/office/users/") && p.endsWith("/password"))
+    return { password: "TvW4-h9qR-2mKz" };
+
+  if (p === "/api/office/users") return { id: 9, password: "TvW4-h9qR-2mKz" };
+
+  if (p === "/api/office/roles")
+    return {
+      roles: [
+        { roleKey: "admin", label: "Principal", caps: [], userCount: 1, isRoot: true },
+        { roleKey: "editor", label: "Office manager", caps: ["cases.view", "cases.edit", "clients.view", "clients.edit", "money.view"], userCount: 0, isRoot: false },
+        { roleKey: "associate", label: "Associate", caps: ["cases.view", "clients.view"], userCount: 1, isRoot: false },
+      ],
+      allCaps: ["cases.view", "cases.edit", "clients.view", "clients.edit", "money.view", "money.edit"],
+    };
+
+  if (p === "/api/office/settings")
+    return {
+      "firm.name": "Your Chamber",
+      "firm.address": "Peshawar High Court, Peshawar",
+      "firm.hours": "Monday to Saturday, 9am – 6pm",
+      "contact.phone": "",
+      "contact.phone2": "",
+      "contact.email": "",
+      "contact.whatsapp": "",
+    };
+
   // --- the chamber's own library ------------------------------------------
   if (p === "/api/office/library/judgments")
     return {
