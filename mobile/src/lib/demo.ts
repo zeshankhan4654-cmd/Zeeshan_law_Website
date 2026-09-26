@@ -122,6 +122,12 @@ const PORTAL_CASES = [
 ];
 
 /** The canned answer for a path, or undefined if this path is not demoed. */
+const DEMO_CLIENTS = [
+  { id: 1, name: "Fazal ur Rehman", phone: "0300 1234567", email: "", portalEnabled: true, portalUsername: "fazal.rehman", caseCount: 2 },
+  { id: 2, name: "Rukhsana Bibi", phone: "0311 7654321", email: "", portalEnabled: false, portalUsername: null, caseCount: 1 },
+  { id: 3, name: "Sher Afzal Khan", phone: "0345 2223334", email: "sher@example.com", portalEnabled: true, portalUsername: "sher.afzal", caseCount: 1 },
+];
+
 export function demoResponse(path: string): unknown {
   const p = path.split("?")[0] ?? path;
 
@@ -144,6 +150,35 @@ export function demoResponse(path: string): unknown {
         "This is a demonstration. The full text of an article appears here in the working system, " +
         "written by the chamber that contributed it.\n\nNothing on this screen is legal advice, and " +
         "no citation shown in the demonstration should be relied on.",
+    };
+  }
+
+  // --- clients -----------------------------------------------------------
+  if (p === "/api/office/clients")
+    return { items: DEMO_CLIENTS, total: DEMO_CLIENTS.length };
+
+  if (p.startsWith("/api/office/clients/") && p.endsWith("/portal"))
+    return { enabled: true, username: "rukhsana.bibi", password: "kJ4t-9wPm-2xQd" };
+
+  if (p.startsWith("/api/office/clients/")) {
+    const id = Number(p.split("/")[4]);
+    const found = DEMO_CLIENTS.find((c) => c.id === id) ?? DEMO_CLIENTS[0]!;
+    return {
+      ...found,
+      address: "Gulbahar No. 3, Peshawar",
+      notes: "Prefers to be telephoned in the evening.",
+      portalShowFees: false,
+      portalMustChangePassword: false,
+      createdAt: "2026-03-11T00:00:00.000Z",
+      cases: [
+        {
+          id: 1,
+          title: "Criminal Appeal against conviction",
+          court: "Peshawar High Court",
+          status: "Active",
+          nextHearing: "2026-09-25T00:00:00.000Z",
+        },
+      ],
     };
   }
 

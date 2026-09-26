@@ -7,6 +7,7 @@ import {
   Home,
   LogIn,
   User,
+  Users,
 } from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,6 +76,7 @@ const STAFF: Item[] = [
     active: (p) => p.startsWith("/diary"),
   },
   { label: "Cases", href: "/files", icon: FolderOpen, active: (p) => p.startsWith("/files") },
+  { label: "Clients", href: "/clients", icon: Users, active: (p) => p.startsWith("/clients") },
   LIBRARY,
   ACCOUNT,
 ];
