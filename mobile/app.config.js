@@ -51,7 +51,14 @@ module.exports = {
   name: "Lawyer360",
   slug: "lawyer360",
   scheme: "lawyer360",
-  version: "0.1.0",
+  /**
+   * What the store listing shows. The build number beside it — Android's
+   * versionCode, Apple's buildNumber — is kept by EAS and raised on every
+   * build, which is why neither appears here (see appVersionSource in
+   * eas.json). This is the number a person reads; that one only has to
+   * increase.
+   */
+  version: "1.0.0",
   orientation: "portrait",
   userInterfaceStyle: "light",
   newArchEnabled: true,
