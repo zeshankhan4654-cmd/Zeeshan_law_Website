@@ -29,7 +29,10 @@ export default function StaffLayout() {
     >
       <Stack.Screen name="diary" options={{ title: "Cause list" }} />
       <Stack.Screen name="files/index" options={{ title: "Cases" }} />
-      <Stack.Screen name="files/[id]" options={{ title: "Case file" }} />
+      <Stack.Screen name="files/new" options={{ title: "New matter" }} />
+      <Stack.Screen name="files/[id]/index" options={{ title: "Case file" }} />
+      <Stack.Screen name="files/[id]/edit" options={{ title: "Edit the matter" }} />
+      <Stack.Screen name="files/[id]/hearing" options={{ title: "Add a hearing" }} />
       <Stack.Screen name="clients/index" options={{ title: "Clients" }} />
       <Stack.Screen name="clients/new" options={{ title: "New client" }} />
       <Stack.Screen name="clients/[id]" options={{ title: "Client" }} />

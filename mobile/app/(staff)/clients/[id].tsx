@@ -19,6 +19,7 @@ export default function ClientFileScreen() {
   const session = useSession();
   const account = session.status === "signed-in" ? session.account : null;
   const mayIssue = can(account, "clients.portal");
+  const mayOpenMatter = can(account, "cases.edit");
 
   /** Shown once, never fetched again — the server keeps only its hash. */
   const [issued, setIssued] = useState<PortalResult | null>(null);
@@ -106,6 +107,19 @@ export default function ClientFileScreen() {
           ))
         )}
       </View>
+
+      {mayOpenMatter ? (
+        <Pressable
+          onPress={() =>
+            router.push(
+              `/files/new?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`
+            )
+          }
+          className="items-center rounded-card border border-gold py-3 active:bg-gold-wash"
+        >
+          <Text className="text-base font-semibold text-gold">Open a matter for them</Text>
+        </Pressable>
+      ) : null}
 
       {/* Access to their own matters — issued by the chamber, never asked
           for. This is the whole of what a client can ever see. */}

@@ -180,3 +180,67 @@ export function dayHeading(isoDate: string): string {
   if (days === 1) return "Tomorrow";
   return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 }
+
+// ---------------------------------------------------------------------------
+// Opening and changing a matter
+// ---------------------------------------------------------------------------
+
+export type CaseDraft = {
+  title: string;
+  court: string;
+  caseType: string;
+  status: string;
+  /** YYYY-MM-DD, or "" for a matter with nothing listed yet. */
+  nextHearing: string;
+  notes: string;
+};
+
+export function useCreateCase() {
+  const token = useAuthToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CaseDraft & { clientId: number }) =>
+      apiFetch<{ id: number }>("/api/office/cases", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ ...body, nextHearing: body.nextHearing || null }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["office", "cases"] });
+      void queryClient.invalidateQueries({ queryKey: ["office", "diary"] });
+      void queryClient.invalidateQueries({ queryKey: ["office", "clients"] });
+    },
+  });
+}
+
+export function useEditCase(caseId: number) {
+  const token = useAuthToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    // The client cannot be changed here, and the API forbids it: a matter
+    // that moved to another client would be a different matter.
+    mutationFn: (body: CaseDraft) =>
+      apiFetch<{ id: number }>(`/api/office/cases/${caseId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ ...body, nextHearing: body.nextHearing || null }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["office", "case", caseId] });
+      void queryClient.invalidateQueries({ queryKey: ["office", "cases"] });
+      void queryClient.invalidateQueries({ queryKey: ["office", "diary"] });
+    },
+  });
+}
+
+export function useAddHearing(caseId: number) {
+  return useCaseMutation<{ hearingDate: string; purpose: string; setAsNext: boolean }>(
+    caseId,
+    (token, body) =>
+      apiFetch(`/api/office/cases/${caseId}/hearings`, {
+        method: "POST",
+        token,
+        body: JSON.stringify(body),
+      })
+  );
+}

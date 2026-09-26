@@ -128,7 +128,7 @@ const DEMO_CLIENTS = [
   { id: 3, name: "Sher Afzal Khan", phone: "0345 2223334", email: "sher@example.com", portalEnabled: true, portalUsername: "sher.afzal", caseCount: 1 },
 ];
 
-export function demoResponse(path: string): unknown {
+export function demoResponse(path: string, method = "GET"): unknown {
   const p = path.split("?")[0] ?? path;
 
   // The demonstration is a shop window, so it shows registration open.
@@ -195,6 +195,12 @@ export function demoResponse(path: string): unknown {
         createdAt: day(-2), clientName: "Fazal ur Rehman", caseId: 1,
         caseTitle: "Criminal Appeal against conviction" },
     ] };
+
+  // Writes in the demonstration answer as though they worked and change
+  // nothing — there is no server behind this, and a form that appeared to
+  // fail would teach the wrong thing about the real app.
+  if (p === "/api/office/cases" && method === "POST") return { id: CASE_DETAIL.id };
+  if (p.startsWith("/api/office/cases/") && p.endsWith("/hearings")) return { ok: true };
 
   if (p === "/api/office/cases") return { items: [CASE_DETAIL], total: 1, limit: 50, offset: 0 };
   if (p.startsWith("/api/office/cases/")) return CASE_DETAIL;

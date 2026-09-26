@@ -1,14 +1,17 @@
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
+import { Plus, Search } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { useOfficeCases, type OfficeCaseSummary } from "@/lib/office";
+import { can, useSession } from "@/lib/session";
 import { formatDate } from "@/lib/portal";
 
 export default function OfficeCases() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const { data, isPending } = useOfficeCases(q);
+  const session = useSession();
+  const mayOpen = can(session.status === "signed-in" ? session.account : null, "cases.edit");
 
   return (
     <View className="flex-1">
@@ -63,6 +66,17 @@ export default function OfficeCases() {
           )}
         />
       )}
+
+      {mayOpen ? (
+        <Pressable
+          onPress={() => router.push("/files/new")}
+          accessibilityRole="button"
+          accessibilityLabel="Open a matter"
+          className="absolute bottom-5 right-5 size-14 items-center justify-center rounded-full bg-ink active:bg-ink-soft"
+        >
+          <Plus size={26} color="#ffffff" />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

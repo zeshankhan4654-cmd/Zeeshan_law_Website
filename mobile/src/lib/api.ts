@@ -46,7 +46,7 @@ export async function apiFetch<T>(
   // runtime — see lib/demo.ts for why that matters.
   if (DEMO) {
     await new Promise((r) => setTimeout(r, 120));   // so loading states are seen
-    return demoResponse(path) as T;
+    return demoResponse(path, init?.method ?? "GET") as T;
   }
 
   const { token, ...rest } = init ?? {};

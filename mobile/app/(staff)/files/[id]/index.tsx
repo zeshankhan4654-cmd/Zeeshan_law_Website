@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Banknote,
   FileText,
@@ -93,6 +93,9 @@ export default function OfficeCaseFile() {
   const caseId = Number(id);
   const session = useSession();
   const account = session.status === "signed-in" ? session.account : null;
+  const router = useRouter();
+  const mayEdit = can(account, "cases.edit");
+  const mayList = can(account, "hearings.edit");
 
   const { data, isPending, isError, error } = useOfficeCase(caseId);
   const postUpdate = usePostUpdate(caseId);
@@ -151,6 +154,27 @@ export default function OfficeCaseFile() {
               Next hearing <Text className="font-semibold">{formatDate(data.nextHearing)}</Text>
             </Text>
           )}
+
+          {mayEdit || mayList ? (
+            <View className="flex-row gap-2 pt-2">
+              {mayList ? (
+                <Pressable
+                  onPress={() => router.push(`/files/${caseId}/hearing`)}
+                  className="flex-1 items-center rounded-card bg-ink py-2.5 active:bg-ink-soft"
+                >
+                  <Text className="text-sm font-semibold text-white">Add a hearing</Text>
+                </Pressable>
+              ) : null}
+              {mayEdit ? (
+                <Pressable
+                  onPress={() => router.push(`/files/${caseId}/edit`)}
+                  className="flex-1 items-center rounded-card border border-rule py-2.5 active:bg-gold-wash"
+                >
+                  <Text className="text-sm font-semibold text-ink">Edit the matter</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <Section icon={<User size={15} color="#9a7622" />} title="Client">
