@@ -79,6 +79,50 @@ module.exports = {
     // As with iOS: fixed for the life of the listing, and it is visible in
     // the Play Store address.
     package: "com.lawyer360.app",
+    /**
+     * Draw behind the status and navigation bars.
+     *
+     * Not a style choice. Android 16, which this build declares (API 36, see
+     * expo-build-properties below), draws every app this way and no longer
+     * lets one opt out. Saying so here is what installs the theme and the
+     * window flags that go with it, and — the part that matters — what makes
+     * react-native-safe-area-context report the real insets. Left unsaid,
+     * Expo assumes the old behaviour, the inset readings disagree with what
+     * the system is actually doing, and content slides under the clock.
+     *
+     * Every screen already keeps clear of the bars: the headers come from
+     * the navigator, which applies the top inset itself, and the tab bar in
+     * src/components/BottomNav.tsx adds the bottom one.
+     */
+    edgeToEdgeEnabled: true,
+    /**
+     * Permissions the build must not ask for.
+     *
+     * Each of these is added to the manifest by a library rather than by us,
+     * and none is needed: the voice note in a client's case thread is
+     * recorded into the app's own cache directory, which needs no storage
+     * permission on any Android this build runs on, and nothing here draws
+     * over other apps. React Native declares SYSTEM_ALERT_WINDOW for its
+     * developer menu, which a release build has no use for.
+     *
+     * Listing them here removes them from the merged manifest. Worth doing
+     * for its own sake — an app should ask for what it uses — and worth
+     * doing before a store review, because the Play Console asks an
+     * advocate's chamber to justify exactly these three, and the honest
+     * answer is that it does not use them.
+     */
+    blockedPermissions: [
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+    ],
+    /**
+     * Android 13's predictive back gesture — the peek at the screen behind
+     * while a back swipe is held. Off, as Expo's own template has it: the
+     * navigator has not opted into it, and turning it on without that makes
+     * the peek show the wrong screen.
+     */
+    predictiveBackGestureEnabled: false,
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#17140F",
@@ -114,6 +158,30 @@ module.exports = {
     "expo-router",
     "expo-secure-store",
     [
+      /**
+       * The Android version the build is compiled and declared against.
+       *
+       * Google Play refuses an upload that declares an older Android than
+       * its current floor, and that floor moves every August: since 31
+       * August 2026 a new app has to declare Android 16 (API level 36) or
+       * higher — see developer.android.com/google/play/requirements/target-sdk.
+       *
+       * The Expo SDK this project is on already defaults to 36, so this
+       * block changes nothing today. It is written out because the number
+       * is a store requirement rather than a preference: stated here, an
+       * upgrade or a downgrade of the SDK cannot quietly drop the build
+       * below what Play accepts, and the number to raise next August is in
+       * the repository where it can be found.
+       */
+      "expo-build-properties",
+      {
+        android: {
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
+        },
+      },
+    ],
+    [
       "expo-notifications",
       {
         icon: "./assets/adaptive-icon.png",
@@ -130,6 +198,17 @@ module.exports = {
       },
     ],
   ],
+  /**
+   * Typed routes: `router.push("/cases/3")` is checked against the files in
+   * app/, so a link to a screen that does not exist is a build error rather
+   * than a blank screen. Expo still reads this flag, and the route
+   * declarations in .expo/types are only written while it is set — removing
+   * it silently turns the checking off, which is why it is still here.
+   */
+  experiments: {
+    typedRoutes: true,
+  },
+
   extra: {
     eas: {
       /**
@@ -148,9 +227,5 @@ module.exports = {
        */
       projectId: process.env.EAS_PROJECT_ID,
     },
-  },
-
-  experiments: {
-    typedRoutes: true,
   },
 };
