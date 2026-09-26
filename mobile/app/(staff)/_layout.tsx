@@ -34,6 +34,8 @@ export default function StaffLayout() {
       <Stack.Screen name="files/[id]/edit" options={{ title: "Edit the matter" }} />
       <Stack.Screen name="files/[id]/hearing" options={{ title: "Add a hearing" }} />
       <Stack.Screen name="files/[id]/fee" options={{ title: "Record a fee" }} />
+      <Stack.Screen name="contact/index" options={{ title: "Calls & enquiries" }} />
+      <Stack.Screen name="contact/new" options={{ title: "Log a contact" }} />
       <Stack.Screen name="money/index" options={{ title: "Money" }} />
       <Stack.Screen name="money/new" options={{ title: "New entry" }} />
       <Stack.Screen name="clients/index" options={{ title: "Clients" }} />

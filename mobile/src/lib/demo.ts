@@ -153,6 +153,29 @@ export function demoResponse(path: string, method = "GET"): unknown {
     };
   }
 
+  // --- what was said, and who wrote in ------------------------------------
+  if (p === "/api/office/communications" && method === "GET")
+    return {
+      items: [
+        { id: 1, method: "call", summary: "Explained the position on the appeal and the likely date. He will bring the remaining papers.", commDate: "2026-09-22T00:00:00.000Z", followUpDue: "2026-09-29T00:00:00.000Z", createdAt: "2026-09-22T00:00:00.000Z", client: { id: 1, name: "Fazal ur Rehman" } },
+        { id: 2, method: "in_person", summary: "Attended chamber about a maintenance matter. Advised on the documents required.", commDate: "2026-09-18T00:00:00.000Z", followUpDue: null, createdAt: "2026-09-18T00:00:00.000Z", client: null },
+      ],
+      due: 1,
+    };
+
+  if (p === "/api/office/communications") return { id: 9 };
+
+  if (p === "/api/office/enquiries")
+    return {
+      items: [
+        { id: 1, name: "Imran Ali", phone: "0333 4445556", email: "", subject: "Property dispute", message: "My brother has occupied our late father's house and will not divide it. Can the chamber advise?", read: false, createdAt: "2026-09-24T00:00:00.000Z" },
+        { id: 2, name: "Nadia Khan", phone: "", email: "nadia@example.com", subject: "Consultation", message: "I would like an appointment about a service matter.", read: true, createdAt: "2026-09-20T00:00:00.000Z" },
+      ],
+      unread: 1,
+    };
+
+  if (p.startsWith("/api/office/enquiries/")) return { ok: true };
+
   // --- the three ledgers ---------------------------------------------------
   if (p === "/api/office/fees")
     return {

@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import {
   AlertTriangle,
   Banknote,
+  MessageSquare,
   Briefcase,
   CalendarDays,
   FolderOpen,
@@ -171,6 +172,13 @@ export default function AccountScreen() {
             title="Money"
             subtitle="Fees, court fees and the chamber's own costs"
             onPress={() => router.push("/money")}
+          />
+
+          <Row
+            icon={<MessageSquare size={20} color="#9a7622" />}
+            title={"Calls & enquiries"}
+            subtitle="What was said, and who wrote in from the website"
+            onPress={() => router.push("/contact")}
           />
         </View>
       )}
