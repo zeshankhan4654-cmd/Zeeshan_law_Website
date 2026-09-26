@@ -129,6 +129,25 @@ officeLibraryRouter.post(
   })
 );
 
+/**
+ * One entry, for a screen that edits it.
+ *
+ * The list route beside this one returns whole rows, so the office on a computer can open an entry from what it already holds. The app arrives at the editor by a link and holds nothing, so it asks.
+ *
+ * Scoped like everything else here: `db` is the chamber's own client, so an
+ * id belonging to another chamber is simply not found.
+ */
+officeLibraryRouter.get(
+  "/library/judgments/:id",
+  requireCap("library.view"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const entry = await db.judgment.findUnique({ where: { id: parseId(req.params.id) } });
+    if (!entry) throw new ApiError(404, "No such entry.");
+    res.json(entry);
+  })
+);
+
 officeLibraryRouter.patch(
   "/library/judgments/:id",
   requireCap("library.edit"),
@@ -199,6 +218,25 @@ officeLibraryRouter.post(
   })
 );
 
+/**
+ * One entry, for a screen that edits it.
+ *
+ * The list route beside this one returns whole rows, so the office on a computer can open an entry from what it already holds. The app arrives at the editor by a link and holds nothing, so it asks.
+ *
+ * Scoped like everything else here: `db` is the chamber's own client, so an
+ * id belonging to another chamber is simply not found.
+ */
+officeLibraryRouter.get(
+  "/library/research/:id",
+  requireCap("library.view"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const entry = await db.research.findUnique({ where: { id: parseId(req.params.id) } });
+    if (!entry) throw new ApiError(404, "No such entry.");
+    res.json(entry);
+  })
+);
+
 officeLibraryRouter.patch(
   "/library/research/:id",
   requireCap("library.edit"),
@@ -266,6 +304,25 @@ officeLibraryRouter.post(
       select: { id: true },
     });
     res.status(201).json(created);
+  })
+);
+
+/**
+ * One entry, for a screen that edits it.
+ *
+ * The list route beside this one returns whole rows, so the office on a computer can open an entry from what it already holds. The app arrives at the editor by a link and holds nothing, so it asks.
+ *
+ * Scoped like everything else here: `db` is the chamber's own client, so an
+ * id belonging to another chamber is simply not found.
+ */
+officeLibraryRouter.get(
+  "/library/media/:id",
+  requireCap("library.view"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const entry = await db.media.findUnique({ where: { id: parseId(req.params.id) } });
+    if (!entry) throw new ApiError(404, "No such entry.");
+    res.json(entry);
   })
 );
 
