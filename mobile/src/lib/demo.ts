@@ -153,6 +153,42 @@ export function demoResponse(path: string, method = "GET"): unknown {
     };
   }
 
+  // --- the three ledgers ---------------------------------------------------
+  if (p === "/api/office/fees")
+    return {
+      items: [
+        { id: 1, kind: "agreed", amount: 150000, entryDate: "2026-03-12T00:00:00.000Z", note: "Brief fee", caseId: 1, caseTitle: "Criminal Appeal against conviction", clientName: "Fazal ur Rehman" },
+        { id: 2, kind: "received", amount: 75000, entryDate: "2026-03-20T00:00:00.000Z", note: "First instalment", caseId: 1, caseTitle: "Criminal Appeal against conviction", clientName: "Fazal ur Rehman" },
+      ],
+      agreed: 150000,
+      received: 75000,
+    };
+
+  if (p === "/api/office/official-fees" && method === "GET")
+    return {
+      items: [
+        { id: 1, caseId: 1, caseTitle: "Criminal Appeal against conviction", kind: "Court fee", amount: 4500, entryDate: "2026-03-14T00:00:00.000Z", note: "" },
+        { id: 2, caseId: null, caseTitle: null, kind: "Copying fee", amount: 1200, entryDate: "2026-04-02T00:00:00.000Z", note: "Certified copies" },
+      ],
+      total: 5700,
+    };
+
+  if (p === "/api/office/expenses" && method === "GET")
+    return {
+      items: [
+        { id: 1, category: "Office rent", amount: 45000, expenseDate: "2026-09-01T00:00:00.000Z", description: "September" },
+        { id: 2, category: "Stationery", amount: 3200, expenseDate: "2026-09-08T00:00:00.000Z", description: "" },
+      ],
+      total: 48200,
+      byCategory: [
+        { category: "Office rent", total: 45000 },
+        { category: "Stationery", total: 3200 },
+      ],
+    };
+
+  if (p === "/api/office/expenses" || p === "/api/office/official-fees") return { id: 9 };
+  if (p.startsWith("/api/office/cases/") && p.endsWith("/fees")) return { id: 9 };
+
   // --- clients -----------------------------------------------------------
   if (p === "/api/office/clients")
     return { items: DEMO_CLIENTS, total: DEMO_CLIENTS.length };

@@ -316,6 +316,14 @@ export default function OfficeCaseFile() {
 
         {data.fees.shown && (
           <Section icon={<Banknote size={15} color="#9a7622" />} title="Fees">
+          {can(account, "money.edit") ? (
+            <Pressable
+              onPress={() => router.push(`/files/${caseId}/fee`)}
+              className="items-center rounded-card border border-gold py-2.5 active:bg-gold-wash"
+            >
+              <Text className="text-sm font-semibold text-gold">Record a fee</Text>
+            </Pressable>
+          ) : null}
             <View className="gap-3 rounded-card border border-rule bg-surface p-4">
               <View className="flex-row justify-between">
                 <Text className="text-sm text-ink-soft">Agreed</Text>
