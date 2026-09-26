@@ -23,7 +23,7 @@ export function Field({
   hint?: string;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
-  autoCapitalize?: "none" | "words" | "sentences";
+  autoCapitalize?: "none" | "words" | "sentences" | "characters";
   /** For an address or a note, which are rarely one line. */
   multiline?: boolean;
 }) {

@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import {
   AlertTriangle,
   Banknote,
+  BookOpen,
   MessageSquare,
   Briefcase,
   CalendarDays,
@@ -179,6 +180,13 @@ export default function AccountScreen() {
             title={"Calls & enquiries"}
             subtitle="What was said, and who wrote in from the website"
             onPress={() => router.push("/contact")}
+          />
+
+          <Row
+            icon={<BookOpen size={20} color="#9a7622" />}
+            title="Your library"
+            subtitle="Judgments, writing and recordings — yours, your site, or shared"
+            onPress={() => router.push("/chamber-library")}
           />
         </View>
       )}

@@ -153,6 +153,31 @@ export function demoResponse(path: string, method = "GET"): unknown {
     };
   }
 
+  // --- the chamber's own library ------------------------------------------
+  if (p === "/api/office/library/judgments")
+    return {
+      items: [
+        { id: 1, title: "Bail in non-bailable offences — the settled rule", citation: "PLD 2024 SC 115", court: "Supreme Court of Pakistan", judges: "", judgmentDate: "2024-02-11T00:00:00.000Z", sections: "", principle: "Further inquiry is a question of degree, not of kind.", summary: "", tags: "bail", sourceUrl: "", published: true, shareState: "approved" },
+        { id: 2, title: "Limitation in a suit for specific performance", citation: "", court: "Peshawar High Court", judges: "", judgmentDate: null, sections: "", principle: "", summary: "", tags: "", sourceUrl: "", published: false, shareState: "none" },
+      ],
+      published: 1,
+      shared: 1,
+    };
+
+  if (p.startsWith("/api/office/library/judgments/")) {
+    const id = Number(p.split("/").pop());
+    return id === 2
+      ? { id: 2, title: "Limitation in a suit for specific performance", citation: "", court: "Peshawar High Court", judges: "", judgmentDate: null, sections: "", principle: "", summary: "", tags: "", sourceUrl: "", published: false, shareState: "none" }
+      : { id: 1, title: "Bail in non-bailable offences — the settled rule", citation: "PLD 2024 SC 115", court: "Supreme Court of Pakistan", judges: "", judgmentDate: "2024-02-11T00:00:00.000Z", sections: "", principle: "Further inquiry is a question of degree, not of kind.", summary: "", tags: "bail", sourceUrl: "", published: true, shareState: "approved" };
+  }
+
+  if (p === "/api/office/library/research")
+    return { items: RESEARCH.map((r) => ({ ...r, topic: r.topic ?? "", body: "", tags: "", published: true, shareState: "approved" })), published: RESEARCH.length, shared: RESEARCH.length };
+
+  if (p === "/api/office/library/media") return { items: [], published: 0, shared: 0 };
+
+  if (p.startsWith("/api/office/library/")) return { id: 9, ok: true };
+
   // --- what was said, and who wrote in ------------------------------------
   if (p === "/api/office/communications" && method === "GET")
     return {
