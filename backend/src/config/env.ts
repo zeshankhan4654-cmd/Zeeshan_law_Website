@@ -1,5 +1,25 @@
-import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { config as loadEnvFile } from "dotenv";
 import Joi from "joi";
+
+/**
+ * The settings file, found by where this file is rather than by where the
+ * process was started.
+ *
+ * `dotenv/config` reads `.env` from the current working directory, which is
+ * only the backend folder when somebody happens to have cd'd there. A
+ * hosting panel starts the server from wherever it likes — cPanel's Node
+ * application manager does — and the server then came up with no
+ * DATABASE_URL at all, reporting the database as unreachable rather than
+ * saying it had never been told where the database was.
+ *
+ * This resolves upwards from this module: `dist/config/env.js` when built
+ * and `src/config/env.ts` when run through tsx are both two levels below
+ * the backend folder, so one path serves both.
+ */
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+loadEnvFile({ path: path.resolve(HERE, "../../.env") });
 
 /**
  * Every environment variable the server needs, validated once at boot.
