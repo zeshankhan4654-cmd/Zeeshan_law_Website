@@ -28,6 +28,7 @@ import {
   useRecordOutcome,
   useReplyToClient,
 } from "@/lib/office";
+import { statementUrl, useStatementLink, whatsappUrl } from "@/lib/money";
 import { formatDate, formatRupees } from "@/lib/portal";
 import { can, useSession } from "@/lib/session";
 
@@ -104,6 +105,8 @@ export default function OfficeCaseFile() {
 
   const [openHearing, setOpenHearing] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [statementProblem, setStatementProblem] = useState<string | null>(null);
+  const statement = useStatementLink();
 
   if (isPending) {
     return (
@@ -132,6 +135,36 @@ export default function OfficeCaseFile() {
       setProblem(err instanceof Error ? err.message : "That did not save.");
     }
   };
+
+  /**
+   * The reminder is composed here and handed to WhatsApp unsent. An advocate
+   * reads it, and changes it, before it reaches a client — software that
+   * demands money on a chamber's behalf without the chamber seeing the words
+   * is how a chamber loses a client it still had.
+   */
+  const outstanding = data.fees.shown ? data.fees.agreed - data.fees.received : 0;
+  const reminder =
+    data.fees.shown && outstanding > 0 && data.client.phone
+      ? whatsappUrl(
+          data.client.phone,
+          `Assalam-o-Alaikum ${data.client.name}. Regarding ${
+            data.caseNo ? `${data.caseNo}, ` : ""
+          }${data.title}: ${formatRupees(outstanding)} is outstanding on the chamber's record. ` +
+            `Please telephone the office if this does not agree with yours.`
+        )
+      : null;
+
+  async function openStatement() {
+    setStatementProblem(null);
+    try {
+      const { path } = await statement.mutateAsync({ scope: "case", id: caseId });
+      await Linking.openURL(statementUrl(path));
+    } catch (e) {
+      setStatementProblem(
+        e instanceof Error ? e.message : "Could not draw the statement."
+      );
+    }
+  }
 
   return (
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -406,6 +439,35 @@ export default function OfficeCaseFile() {
                 </Text>
               </View>
             </View>
+
+            {/* What a client actually asks for. The statement is a page the
+                browser opens and prints; the app asks for a link to it at
+                the moment it is wanted rather than holding one, because the
+                link is a credential with ten minutes on it. */}
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => void openStatement()}
+                disabled={statement.isPending}
+                className="flex-1 items-center rounded-card border border-rule py-2.5 active:bg-gold-wash"
+              >
+                <Text className="text-sm font-semibold text-ink">
+                  {statement.isPending ? "Drawing…" : "Statement"}
+                </Text>
+              </Pressable>
+
+              {reminder ? (
+                <Pressable
+                  onPress={() => void Linking.openURL(reminder)}
+                  className="flex-1 items-center rounded-card border border-rule py-2.5 active:bg-gold-wash"
+                >
+                  <Text className="text-sm font-semibold text-ink">Remind on WhatsApp</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {statementProblem ? (
+              <Text className="text-xs text-danger">{statementProblem}</Text>
+            ) : null}
           </Section>
         )}
       </ScrollView>

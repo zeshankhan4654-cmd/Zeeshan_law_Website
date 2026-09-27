@@ -364,6 +364,11 @@ export function demoResponse(path: string, method = "GET"): unknown {
     };
 
   if (p.startsWith("/api/office/official-fees/") && p.endsWith("/recovered")) return undefined;
+  // The demonstration has no server to draw a statement from, and a link to
+  // nowhere is worse than none: the button says so instead of opening a
+  // broken page.
+  if (p.startsWith("/api/office/statements/"))
+    throw new Error("A statement is drawn from the chamber's own records, which the demonstration has none of.");
   if (p === "/api/office/expenses" || p === "/api/office/official-fees") return { id: 9 };
   if (p.startsWith("/api/office/cases/") && p.endsWith("/fees")) return { id: 9 };
 

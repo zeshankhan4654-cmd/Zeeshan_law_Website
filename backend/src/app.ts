@@ -18,6 +18,7 @@ import { portalCasesRouter } from "./routes/portal-cases.route.js";
 import { platformRouter } from "./routes/platform.route.js";
 import { portalRouter } from "./routes/portal.route.js";
 import { privacyRouter } from "./routes/privacy.route.js";
+import { statementRouter } from "./routes/statement.route.js";
 import { signupRouter } from "./routes/signup.route.js";
 import { siteRouter } from "./routes/site.route.js";
 
@@ -88,6 +89,13 @@ export function createApp(): Express {
    * the address goes in the store listing. See routes/privacy.route.ts.
    */
   app.use("/privacy", privacyRouter);
+
+  /**
+   * Also outside /api, and for the same reason: a browser opens it to print
+   * it. Its own authority is the grant in the address — see
+   * routes/statement.route.ts.
+   */
+  app.use("/statement", statementRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -67,6 +67,51 @@ export function verifySession(token: string): SessionPayload {
   throw new Error("Unrecognised session kind");
 }
 
+/**
+ * A grant to open one statement of account, and nothing else.
+ *
+ * A statement is printed, which means a browser opens it, which means the
+ * address has to carry its own authority — a browser following a link sends
+ * no Authorization header. Putting the session token in the address would
+ * work and would be a bad trade: a link copied into a message, a browser
+ * history or a referrer would hand over the whole chamber.
+ *
+ * So this is minted instead. It names one matter or one client, it is good
+ * for ten minutes, and it is deliberately not a `SessionPayload` — its kind
+ * is unknown to `verifySession`, which refuses it, so a leaked statement
+ * link opens a statement and can do nothing else at all.
+ */
+export type StatementGrant = {
+  kind: "statement";
+  firm: number;
+  scope: "case" | "client";
+  id: number;
+};
+
+/** Long enough to reach the print dialogue, short enough not to be worth keeping. */
+const STATEMENT_SECONDS = 600;
+
+export function signStatementGrant(grant: Omit<StatementGrant, "kind">): string {
+  return jwt.sign({ ...grant, kind: "statement" }, env.jwt.secret, {
+    expiresIn: STATEMENT_SECONDS,
+  });
+}
+
+/** Throws unless this is a statement grant — a session token is refused here. */
+export function verifyStatementGrant(token: string): StatementGrant {
+  const decoded = jwt.verify(token, env.jwt.secret) as JwtPayload;
+  const firm = Number(decoded.firm);
+  const id = Number(decoded.id);
+
+  if (decoded.kind !== "statement") throw new Error("Not a statement grant");
+  if (!Number.isInteger(firm) || firm <= 0) throw new Error("Grant names no chamber");
+  if (!Number.isInteger(id) || id <= 0) throw new Error("Grant names nothing");
+  if (decoded.scope !== "case" && decoded.scope !== "client") {
+    throw new Error("Grant has no recognised scope");
+  }
+  return { kind: "statement", firm, scope: decoded.scope, id };
+}
+
 /** The office cookie and the client-portal cookie are separate, so signing
  *  into one in a browser never disturbs the other. */
 export const SESSION_COOKIE = "session";

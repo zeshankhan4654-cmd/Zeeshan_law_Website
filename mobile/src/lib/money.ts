@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "./api";
+import { API_URL, apiFetch } from "./api";
 import { useAuthToken } from "./session";
 
 /**
@@ -166,4 +166,51 @@ export function useSetRecovered() {
       body: JSON.stringify({ recovered }),
     })
   );
+}
+
+/**
+ * A link to a statement of account, for a matter or for a whole client.
+ *
+ * The statement is a page the browser prints, so what comes back is an
+ * address rather than data. It carries a grant that opens that one
+ * statement for ten minutes — see the backend's signStatementGrant — which
+ * is why it is asked for at the moment it is opened rather than held.
+ */
+export function useStatementLink() {
+  const token = useAuthToken();
+  return useMutation({
+    mutationFn: ({ scope, id }: { scope: "case" | "client"; id: number }) =>
+      apiFetch<{ path: string }>(`/api/office/statements/${scope}/${id}`, {
+        method: "POST",
+        token,
+      }),
+  });
+}
+
+/** The statement's full address, for handing to a browser. */
+export function statementUrl(path: string): string {
+  return `${API_URL}${path}`;
+}
+
+/**
+ * A reminder to a client about what is due, over WhatsApp.
+ *
+ * Opened as a prepared message rather than sent: the chamber reads it, and
+ * changes it, before anything reaches a client. A demand for money sent by
+ * software without an advocate seeing it is how a chamber loses a client it
+ * still had.
+ *
+ * Only digits survive from the number. A Pakistani number written 0300
+ * 1234567 has to reach WhatsApp as 923001234567, and the leading zero is
+ * the local form of the country code rather than part of the number.
+ */
+export function whatsappUrl(phone: string, message: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 7) return null;
+  const international = digits.startsWith("0")
+    ? `92${digits.slice(1)}`
+    : digits.startsWith("92")
+      ? digits
+      : digits;
+  return `https://wa.me/${international}?text=${encodeURIComponent(message)}`;
 }

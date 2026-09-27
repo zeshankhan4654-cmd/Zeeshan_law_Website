@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
+import { signStatementGrant } from "../lib/jwt.js";
 import {
   requireCap,
   requireNoPendingPasswordChange,
@@ -400,5 +401,48 @@ officeDiaryRouter.delete(
     const removed = await db.expense.deleteMany({ where: { id } });
     if (removed.count === 0) throw new ApiError(404, "No such entry.");
     res.status(204).end();
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Statements of account
+// ---------------------------------------------------------------------------
+
+/**
+ * A link to one statement, good for ten minutes.
+ *
+ * The statement itself is a page a browser prints, and a browser following a
+ * link sends no Authorization header — so the authority has to travel in the
+ * address. What travels is a grant naming one matter or one client, not the
+ * session: a link left in a browser history or pasted into a message opens
+ * a statement and can do nothing else.
+ *
+ * Issued by POST rather than GET because it mints a credential, and a
+ * credential should not be produced by anything a browser might prefetch.
+ */
+officeDiaryRouter.post(
+  "/statements/:scope/:id",
+  requireCap("money.view"),
+  asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
+    const scope = req.params.scope;
+    const id = parseId(req.params.id);
+
+    if (scope !== "case" && scope !== "client") {
+      throw new ApiError(400, "A statement is drawn for a matter or for a client.");
+    }
+
+    // Asked of this chamber's own client, so an id from elsewhere cannot
+    // mint a grant for it.
+    const exists =
+      scope === "case"
+        ? await db.case.findUnique({ where: { id }, select: { id: true } })
+        : await db.client.findUnique({ where: { id }, select: { id: true } });
+    if (!exists) {
+      throw new ApiError(404, "That is not in this chamber's records.");
+    }
+
+    const token = signStatementGrant({ firm: firmId, scope, id });
+    res.json({ path: `/statement/${scope}/${id}?t=${encodeURIComponent(token)}` });
   })
 );
