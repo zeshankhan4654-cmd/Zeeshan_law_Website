@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Search, UserCircle, X } from "lucide-react-native";
+import { ChevronDown, ChevronRight, Search, UserCircle, X } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { DateChoice, isoDay } from "@/components/DateChoice";
@@ -22,7 +22,14 @@ export default function LogContact() {
   const log = useLogCommunication();
 
   const [method, setMethod] = useState<CommMethod>("call");
+  const [direction, setDirection] = useState("Received");
   const [summary, setSummary] = useState("");
+  const [subject, setSubject] = useState("");
+  const [personName, setPersonName] = useState("");
+  const [personNumber, setPersonNumber] = useState("");
+  const [personRole, setPersonRole] = useState("");
+  const [time, setTime] = useState("");
+  const [who, setWho] = useState(false);
   const [date, setDate] = useState(() => isoDay(new Date()));
   const [client, setClient] = useState<{ id: number; name: string } | null>(null);
   const [picking, setPicking] = useState(false);
@@ -36,9 +43,16 @@ export default function LogContact() {
     try {
       await log.mutateAsync({
         clientId: client?.id ?? null,
+        caseId: null,
         method,
+        direction,
+        personName: personName.trim(),
+        personNumber: personNumber.trim(),
+        personRole: personRole.trim(),
+        subject: subject.trim(),
         summary: summary.trim(),
         commDate: new Date(`${date}T00:00:00`).toISOString(),
+        commTime: time.trim(),
         followUpDue: followUp ? new Date(`${followUp}T00:00:00`).toISOString() : null,
       });
       router.back();
@@ -77,6 +91,38 @@ export default function LogContact() {
         </View>
       </View>
 
+      <View className="gap-1.5">
+        <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-ink-soft">
+          Which way
+        </Text>
+        <View className="flex-row gap-2">
+          {["Received", "Sent"].map((d) => {
+            const on = direction === d;
+            return (
+              <Pressable
+                key={d}
+                onPress={() => setDirection(d)}
+                className={`flex-1 items-center rounded-card border px-3 py-2 ${
+                  on ? "border-gold bg-gold-wash" : "border-rule bg-surface"
+                }`}
+              >
+                <Text className={`text-sm ${on ? "font-semibold text-gold" : "text-ink-soft"}`}>
+                  {d === "Received" ? "They rang us" : "We rang them"}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <Field
+        label="About"
+        value={subject}
+        onChange={setSubject}
+        placeholder="In a few words"
+        autoCapitalize="sentences"
+      />
+
       <Field
         label="What was said"
         value={summary}
@@ -85,6 +131,59 @@ export default function LogContact() {
         autoCapitalize="sentences"
         hint="Enough that it still makes sense in a year."
       />
+
+      <Pressable
+        testID="contact-person"
+        onPress={() => setWho((w) => !w)}
+        className="flex-row items-center gap-2 rounded-card border border-rule bg-surface px-4 py-3 active:bg-gold-wash"
+      >
+        {who ? (
+          <ChevronDown size={18} color="#9a7622" />
+        ) : (
+          <ChevronRight size={18} color="#9a7622" />
+        )}
+        <Text className="flex-1 text-sm font-semibold text-ink">
+          {who ? "Fewer details" : "Who was at the other end, and when"}
+        </Text>
+      </Pressable>
+
+      {who && (
+        <>
+          {/* Recorded apart from the client below, because it is so often
+              not the client: opposing counsel, a reader, a relative
+              carrying a message. Writing "the client rang" when it was the
+              client's brother is how a file stops being evidence. */}
+          <Field
+            label="Their name"
+            value={personName}
+            onChange={setPersonName}
+            placeholder="Who actually spoke"
+          />
+          <Field
+            label="Their number"
+            value={personNumber}
+            onChange={setPersonNumber}
+            placeholder="If you have it"
+            keyboardType="phone-pad"
+            autoCapitalize="none"
+          />
+          <Field
+            label="What they were"
+            value={personRole}
+            onChange={setPersonRole}
+            placeholder="Client, opposing counsel, court staff, witness"
+            autoCapitalize="sentences"
+          />
+          <Field
+            label="Time"
+            value={time}
+            onChange={setTime}
+            placeholder="11:20"
+            autoCapitalize="none"
+            hint="As you would write it. A note made this evening about a call at eleven should say eleven."
+          />
+        </>
+      )}
 
       <View className="gap-1.5">
         <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-ink-soft">

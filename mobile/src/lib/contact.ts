@@ -26,11 +26,21 @@ export const METHOD_LABEL: Record<CommMethod, string> = {
 export type Communication = {
   id: number;
   method: CommMethod;
+  /** Who rang whom. */
+  direction: string;
+  subject: string;
   summary: string;
+  /** The person at the other end, who is often not the client. */
+  personName: string;
+  personNumber: string;
+  personRole: string;
   commDate: string;
+  /** The hour, as written. */
+  commTime: string;
   followUpDue: string | null;
   createdAt: string;
   client: { id: number; name: string } | null;
+  case: { id: number; title: string; caseNo: string } | null;
 };
 
 export type Enquiry = {
@@ -60,9 +70,16 @@ export function useLogCommunication() {
   return useMutation({
     mutationFn: (body: {
       clientId: number | null;
+      caseId: number | null;
       method: CommMethod;
+      direction: string;
+      personName: string;
+      personNumber: string;
+      personRole: string;
+      subject: string;
       summary: string;
       commDate: string;
+      commTime: string;
       followUpDue: string | null;
     }) =>
       apiFetch<{ id: number }>("/api/office/communications", {

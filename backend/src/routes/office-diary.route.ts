@@ -4,6 +4,7 @@ import {
   requireCap,
   requireNoPendingPasswordChange,
   requireStaff,
+  staffSession,
   tenant,
 } from "../middleware/auth.js";
 import { ApiError } from "../middleware/errorHandler.js";
@@ -14,11 +15,13 @@ import {
   expenseSchema,
   ledgerQuerySchema,
   officialFeeSchema,
+  recoveredSchema,
   type CommunicationInput,
   type CommunicationListQuery,
   type ExpenseInput,
   type LedgerQuery,
   type OfficialFeeInput,
+  type RecoveredInput,
 } from "../validation/office-diary.schema.js";
 
 /**
@@ -60,7 +63,18 @@ officeDiaryRouter.get(
     today.setUTCHours(23, 59, 59, 999);
 
     const where = {
-      ...(q ? { summary: { contains: q, mode: "insensitive" as const } } : {}),
+      ...(q
+        ? {
+            OR: [
+              { summary: { contains: q, mode: "insensitive" as const } },
+              { subject: { contains: q, mode: "insensitive" as const } },
+              { personName: { contains: q, mode: "insensitive" as const } },
+              { personNumber: { contains: q, mode: "insensitive" as const } },
+              { client: { name: { contains: q, mode: "insensitive" as const } } },
+              { case: { title: { contains: q, mode: "insensitive" as const } } },
+            ],
+          }
+        : {}),
       // "Due" means a follow-up date that has arrived or passed.
       ...(dueOnly ? { followUpDue: { not: null, lte: today } } : {}),
     };
@@ -71,9 +85,11 @@ officeDiaryRouter.get(
         orderBy: [{ commDate: "desc" }, { id: "desc" }],
         take: limit,
         select: {
-          id: true, method: true, summary: true, commDate: true,
-          followUpDue: true, createdAt: true,
+          id: true, method: true, direction: true, summary: true, subject: true,
+          personName: true, personNumber: true, personRole: true,
+          commDate: true, commTime: true, followUpDue: true, createdAt: true,
           client: { select: { id: true, name: true } },
+          case: { select: { id: true, title: true, caseNo: true } },
         },
       }),
       db.communication.count({ where: { followUpDue: { not: null, lte: today } } }),
@@ -97,6 +113,13 @@ officeDiaryRouter.post(
         select: { id: true },
       });
       if (!client) throw new ApiError(400, "That client does not exist.");
+    }
+    if (data.caseId !== null) {
+      const matter = await db.case.findUnique({
+        where: { id: data.caseId },
+        select: { id: true },
+      });
+      if (!matter) throw new ApiError(400, "That matter is not in this chamber's records.");
     }
 
     const created = await db.communication.create({
@@ -201,13 +224,17 @@ officeDiaryRouter.get(
     const range = between(from, to);
     const where = Object.keys(range).length ? { entryDate: range } : {};
 
-    const [rows, sum] = await Promise.all([
+    const [rows, sum, outstanding] = await Promise.all([
       db.officialFee.findMany({
         where,
         orderBy: [{ entryDate: "desc" }, { id: "desc" }],
         take: limit,
       }),
       db.officialFee.aggregate({ where, _sum: { amount: true } }),
+      db.officialFee.aggregate({
+        where: { ...where, paidBy: "office", recoveredAt: null },
+        _sum: { amount: true },
+      }),
     ]);
 
     // OfficialFee has no relation to Case in the schema, so the titles are
@@ -224,11 +251,22 @@ officeDiaryRouter.get(
         caseId: r.caseId,
         caseTitle: r.caseId ? (titles.get(r.caseId) ?? null) : null,
         kind: r.kind,
+        description: r.description,
         amount: Number(r.amount),
         entryDate: r.entryDate,
+        receiptNo: r.receiptNo,
+        paidBy: r.paidBy,
+        recoveredAt: r.recoveredAt,
         note: r.note,
       })),
       total: Number(sum._sum.amount ?? 0),
+      /**
+       * What the chamber has laid out and not had back. The question this
+       * ledger exists to answer: a court fee is not the chamber's expense,
+       * it is the chamber's money sitting in a client's matter, and a total
+       * that does not separate the two tells an advocate nothing.
+       */
+      outstanding: Number(outstanding._sum.amount ?? 0),
     });
   })
 );
@@ -249,8 +287,35 @@ officeDiaryRouter.post(
       if (!matter) throw new ApiError(400, "That case does not exist.");
     }
 
-    const created = await db.officialFee.create({ data: { ...data, firmId }, select: { id: true } });
+    const created = await db.officialFee.create({
+      data: { ...data, firmId, createdBy: staffSession(req).username },
+      select: { id: true },
+    });
     res.status(201).json(created);
+  })
+);
+
+/**
+ * Marking what the chamber advanced as having come back — or as not, after
+ * all, when it was ticked in error.
+ */
+officeDiaryRouter.post(
+  "/official-fees/:id/recovered",
+  requireCap("money.edit"),
+  validate(recoveredSchema),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const id = parseId(req.params.id);
+    const { recovered } = req.body as RecoveredInput;
+
+    const existing = await db.officialFee.findUnique({ where: { id } });
+    if (!existing) throw new ApiError(404, "No such entry.");
+
+    await db.officialFee.update({
+      where: { id },
+      data: { recoveredAt: recovered ? new Date() : null },
+    });
+    res.status(204).end();
   })
 );
 
@@ -306,8 +371,20 @@ officeDiaryRouter.post(
   validate(expenseSchema),
   asyncHandler(async (req, res) => {
     const { db, firmId } = tenant(req);
+    const data = req.body as ExpenseInput;
+
+    // An expense put against a matter is recoverable from that client, so
+    // the matter has to be one of this chamber's before it is written down.
+    if (data.caseId !== null) {
+      const matter = await db.case.findUnique({
+        where: { id: data.caseId },
+        select: { id: true },
+      });
+      if (!matter) throw new ApiError(400, "That matter is not in this chamber's records.");
+    }
+
     const created = await db.expense.create({
-      data: { ...(req.body as ExpenseInput), firmId },
+      data: { ...data, firmId, createdBy: staffSession(req).username },
       select: { id: true },
     });
     res.status(201).json(created);

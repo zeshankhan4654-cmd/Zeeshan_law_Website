@@ -339,14 +339,20 @@ officeRecordsRouter.post(
   asyncHandler(async (req, res) => {
     const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
-    const { kind, amount, entryDate, note } = req.body as FeeInput;
+    const { kind, amount, entryDate, mode, receiptNo, note } = req.body as FeeInput;
 
     const exists = await db.case.findUnique({ where: { id: caseId }, select: { id: true } });
     if (!exists) throw new ApiError(404, "No such case.");
 
     const fee = await db.fee.create({
-      data: { firmId, caseId, kind, amount, entryDate, note },
-      select: { id: true, kind: true, amount: true, entryDate: true, note: true },
+      data: {
+        firmId, caseId, kind, amount, entryDate, mode, receiptNo, note,
+        createdBy: staffSession(req).username,
+      },
+      select: {
+        id: true, kind: true, amount: true, entryDate: true,
+        mode: true, receiptNo: true, note: true,
+      },
     });
 
     res.status(201).json({ ...fee, amount: Number(fee.amount) });

@@ -31,8 +31,14 @@ export type OfficialFeeEntry = {
   caseId: number | null;
   caseTitle: string | null;
   kind: string;
+  description: string;
   amount: number;
   entryDate: string;
+  receiptNo: string;
+  /** "office" or "client". Only the first is money owed back. */
+  paidBy: string;
+  /** Null while the chamber is still out of pocket. */
+  recoveredAt: string | null;
   note: string;
 };
 
@@ -42,6 +48,9 @@ export type ExpenseEntry = {
   amount: number;
   expenseDate: string;
   description: string;
+  paidTo: string;
+  mode: string;
+  caseId: number | null;
 };
 
 export function useFeeLedger() {
@@ -61,7 +70,7 @@ export function useOfficialFees() {
   return useQuery({
     queryKey: ["office", "money", "official"],
     queryFn: () =>
-      apiFetch<{ items: OfficialFeeEntry[]; total: number }>("/api/office/official-fees", {
+      apiFetch<{ items: OfficialFeeEntry[]; total: number; outstanding: number }>("/api/office/official-fees", {
         token,
       }),
     enabled: token !== null,
@@ -110,8 +119,12 @@ export function useAddOfficialFee() {
   return useMoneyMutation<{
     caseId: number | null;
     kind: string;
+    description: string;
     amount: number;
     entryDate: string;
+    receiptNo: string;
+    /** "office" when the chamber laid it out, "client" when they paid it. */
+    paidBy: string;
     note: string;
   }>((token, body) =>
     apiFetch("/api/office/official-fees", {
@@ -128,11 +141,29 @@ export function useAddExpense() {
     amount: number;
     expenseDate: string;
     description: string;
+    paidTo: string;
+    mode: string;
+    caseId: number | null;
   }>((token, body) =>
     apiFetch("/api/office/expenses", {
       method: "POST",
       token,
       body: JSON.stringify(body),
+    })
+  );
+}
+
+/**
+ * Marking what the chamber advanced as recovered — or as not, when it was
+ * ticked in error. What is still out of pocket is the only question this
+ * ledger exists to answer, so it has to be correctable.
+ */
+export function useSetRecovered() {
+  return useMoneyMutation<{ id: number; recovered: boolean }>((token, { id, recovered }) =>
+    apiFetch(`/api/office/official-fees/${id}/recovered`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ recovered }),
     })
   );
 }

@@ -287,8 +287,24 @@ export function demoResponse(path: string, method = "GET"): unknown {
   if (p === "/api/office/communications" && method === "GET")
     return {
       items: [
-        { id: 1, method: "call", summary: "Explained the position on the appeal and the likely date. He will bring the remaining papers.", commDate: "2026-09-22T00:00:00.000Z", followUpDue: "2026-09-29T00:00:00.000Z", createdAt: "2026-09-22T00:00:00.000Z", client: { id: 1, name: "Fazal ur Rehman" } },
-        { id: 2, method: "in_person", summary: "Attended chamber about a maintenance matter. Advised on the documents required.", commDate: "2026-09-18T00:00:00.000Z", followUpDue: null, createdAt: "2026-09-18T00:00:00.000Z", client: null },
+        { id: 1, method: "call", direction: "Sent", subject: "The next date",
+          summary: "Explained the position on the appeal and the likely date. He will bring the remaining papers.",
+          personName: "Fazal ur Rehman", personNumber: "0300 1234567", personRole: "Client",
+          commDate: "2026-09-22T00:00:00.000Z", commTime: "16:40",
+          followUpDue: "2026-09-29T00:00:00.000Z", createdAt: "2026-09-22T00:00:00.000Z",
+          client: { id: 1, name: "Fazal ur Rehman" },
+          case: { id: 1, title: "The State vs Sher Afzal Khan", caseNo: "Cr.A. 412/2026" } },
+        { id: 2, method: "call", direction: "Received", subject: "Settlement proposal",
+          summary: "Rang to say his client will consider a compromise before the next date.",
+          personName: "Mr Iqbal", personNumber: "0300 7654321", personRole: "Opposing counsel",
+          commDate: "2026-09-19T00:00:00.000Z", commTime: "11:20",
+          followUpDue: null, createdAt: "2026-09-19T00:00:00.000Z",
+          client: { id: 1, name: "Fazal ur Rehman" }, case: null },
+        { id: 3, method: "in_person", direction: "Received", subject: "",
+          summary: "Attended chamber about a maintenance matter. Advised on the documents required.",
+          personName: "", personNumber: "", personRole: "",
+          commDate: "2026-09-18T00:00:00.000Z", commTime: "",
+          followUpDue: null, createdAt: "2026-09-18T00:00:00.000Z", client: null, case: null },
       ],
       due: 1,
     };
@@ -320,17 +336,25 @@ export function demoResponse(path: string, method = "GET"): unknown {
   if (p === "/api/office/official-fees" && method === "GET")
     return {
       items: [
-        { id: 1, caseId: 1, caseTitle: "Criminal Appeal against conviction", kind: "Court fee", amount: 4500, entryDate: "2026-03-14T00:00:00.000Z", note: "" },
-        { id: 2, caseId: null, caseTitle: null, kind: "Copying fee", amount: 1200, entryDate: "2026-04-02T00:00:00.000Z", note: "Certified copies" },
+        { id: 1, caseId: 1, caseTitle: "The State vs Sher Afzal Khan", kind: "Court fee",
+          description: "Institution of the appeal", amount: 4500,
+          entryDate: "2026-03-14T00:00:00.000Z", receiptNo: "R-8841",
+          paidBy: "office", recoveredAt: null, note: "" },
+        { id: 2, caseId: null, caseTitle: null, kind: "Copying fee",
+          description: "", amount: 1200, entryDate: "2026-04-02T00:00:00.000Z",
+          receiptNo: "", paidBy: "client", recoveredAt: null, note: "Certified copies" },
       ],
       total: 5700,
+      outstanding: 4500,
     };
 
   if (p === "/api/office/expenses" && method === "GET")
     return {
       items: [
-        { id: 1, category: "Office rent", amount: 45000, expenseDate: "2026-09-01T00:00:00.000Z", description: "September" },
-        { id: 2, category: "Stationery", amount: 3200, expenseDate: "2026-09-08T00:00:00.000Z", description: "" },
+        { id: 1, category: "Office rent", amount: 45000, expenseDate: "2026-09-01T00:00:00.000Z",
+          description: "September", paidTo: "The landlord", mode: "Bank", caseId: null },
+        { id: 2, category: "Stationery", amount: 3200, expenseDate: "2026-09-08T00:00:00.000Z",
+          description: "", paidTo: "Khyber Stationers", mode: "Cash", caseId: null },
       ],
       total: 48200,
       byCategory: [
@@ -339,6 +363,7 @@ export function demoResponse(path: string, method = "GET"): unknown {
       ],
     };
 
+  if (p.startsWith("/api/office/official-fees/") && p.endsWith("/recovered")) return undefined;
   if (p === "/api/office/expenses" || p === "/api/office/official-fees") return { id: 9 };
   if (p.startsWith("/api/office/cases/") && p.endsWith("/fees")) return { id: 9 };
 

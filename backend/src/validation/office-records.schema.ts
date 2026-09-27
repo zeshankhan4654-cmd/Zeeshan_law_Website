@@ -134,9 +134,24 @@ export const feeSchema = Joi.object({
   kind: Joi.string().valid("agreed", "received").required(),
   amount: Joi.number().min(0).max(999_999_999).required(),
   entryDate: Joi.date().iso().default(() => new Date()),
+  /** Cash, bank, cheque, easypaisa — free text, because this changes. */
+  mode: text(48),
+  /**
+   * The receipt the client was given, and the number they quote when they
+   * say they have already paid. Without it that conversation has nowhere
+   * to go.
+   */
+  receiptNo: text(96),
   note: text(300),
 });
-export type FeeInput = { kind: string; amount: number; entryDate: Date; note: string };
+export type FeeInput = {
+  kind: string;
+  amount: number;
+  entryDate: Date;
+  mode: string;
+  receiptNo: string;
+  note: string;
+};
 
 export const documentMetaSchema = Joi.object({
   title: Joi.string().trim().min(1).max(300).required(),

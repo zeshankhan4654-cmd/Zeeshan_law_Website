@@ -2,7 +2,7 @@ import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
-import { useExpenses, useFeeLedger, useOfficialFees } from "@/lib/money";
+import { useExpenses, useFeeLedger, useOfficialFees, useSetRecovered } from "@/lib/money";
 import { formatDate, formatRupees } from "@/lib/portal";
 import { can, useSession } from "@/lib/session";
 
@@ -145,30 +145,60 @@ function Fees() {
 
 function Official() {
   const { data, isPending } = useOfficialFees();
+  const setRecovered = useSetRecovered();
   if (isPending) return <Loading />;
 
   return (
     <ScrollView contentContainerClassName="gap-3 p-4 pb-24">
       <View className="flex-row gap-3 rounded-card border border-rule bg-surface p-4">
         <Total label="Paid to courts" value={data?.total ?? 0} />
+        {/* The number an advocate is actually looking for. A total that
+            mixes what the chamber advanced with what the client paid at
+            the counter answers nothing. */}
+        <Total label="Still out of pocket" value={data?.outstanding ?? 0} />
       </View>
       <Text className="px-1 text-xs leading-5 text-ink-soft">
         Money paid to a court or registry — through the chamber, never to it. Kept apart from
-        fees so it is never counted as what the chamber earned.
+        fees so it is never counted as what the chamber earned. Tap what the chamber laid out to
+        mark it recovered.
       </Text>
 
       {(data?.items ?? []).length === 0 ? (
         <Empty>Nothing recorded yet.</Empty>
       ) : (
-        data?.items.map((f) => (
-          <Row
-            key={f.id}
-            title={f.kind}
-            subtitle={[f.caseTitle, f.note].filter(Boolean).join(" · ") || "Not against a matter"}
-            amount={f.amount}
-            date={f.entryDate}
-          />
-        ))
+        data?.items.map((f) => {
+          const advanced = f.paidBy === "office";
+          const back = f.recoveredAt !== null;
+          return (
+            <Pressable
+              key={f.id}
+              // Only what the chamber advanced can come back. A fee the
+              // client paid at the counter was never the chamber's to
+              // recover, so there is nothing to tick.
+              disabled={!advanced || setRecovered.isPending}
+              onPress={() =>
+                void setRecovered.mutateAsync({ id: f.id, recovered: !back })
+              }
+              className={advanced ? "active:opacity-70" : undefined}
+            >
+              <Row
+                title={f.kind}
+                subtitle={
+                  [
+                    f.caseTitle,
+                    f.description || f.note,
+                    f.receiptNo ? `Receipt ${f.receiptNo}` : "",
+                    advanced ? (back ? "Recovered" : "Chamber is out of pocket") : "Client paid it",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Not against a matter"
+                }
+                amount={f.amount}
+                date={f.entryDate}
+              />
+            </Pressable>
+          );
+        })
       )}
     </ScrollView>
   );

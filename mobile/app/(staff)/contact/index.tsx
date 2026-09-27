@@ -100,14 +100,44 @@ function Log() {
                 <Text className="rounded-full bg-gold-wash px-2 py-0.5 text-[11px] font-semibold text-gold">
                   {METHOD_LABEL[c.method] ?? c.method}
                 </Text>
-                <Text className="flex-1 text-xs text-ink-soft">{formatDate(c.commDate)}</Text>
+                {/* Which way it went. A chamber asked a year later what it
+                    advised has to be able to say whether the client rang
+                    it or it rang the client. */}
+                {c.direction ? (
+                  <Text className="text-[11px] font-semibold text-ink-soft">
+                    {c.direction === "Sent" ? "We rang" : "They rang"}
+                  </Text>
+                ) : null}
+                <Text className="flex-1 text-right text-xs text-ink-soft">
+                  {formatDate(c.commDate)}
+                  {c.commTime ? ` · ${c.commTime}` : ""}
+                </Text>
               </View>
-              {c.client ? (
+
+              {c.subject ? (
+                <Text className="text-sm font-semibold leading-5 text-ink">{c.subject}</Text>
+              ) : null}
+
+              {c.personName || c.client ? (
                 <View className="flex-row items-center gap-2">
                   <User size={14} color="#9a7622" />
-                  <Text className="text-sm font-semibold text-ink">{c.client.name}</Text>
+                  <Text className="flex-1 text-sm text-ink">
+                    <Text className="font-semibold">{c.personName || c.client?.name}</Text>
+                    {c.personRole ? <Text className="text-ink-soft"> · {c.personRole}</Text> : null}
+                    {c.personName && c.client && c.personName !== c.client.name ? (
+                      <Text className="text-ink-soft"> · for {c.client.name}</Text>
+                    ) : null}
+                  </Text>
                 </View>
               ) : null}
+
+              {c.case ? (
+                <Text className="text-xs text-ink-soft">
+                  {c.case.caseNo ? `${c.case.caseNo} — ` : ""}
+                  {c.case.title}
+                </Text>
+              ) : null}
+
               <Text className="text-sm leading-6 text-ink">{c.summary}</Text>
               {c.followUpDue ? (
                 <Text
