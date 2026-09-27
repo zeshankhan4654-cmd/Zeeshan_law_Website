@@ -71,6 +71,7 @@ model Firm {
   testimonials   Testimonial[]
   posts          Post[]
   pushTokens     PushToken[]
+  diaryTasks     DiaryTask[]
 
   @@map("firms")
 }
@@ -239,6 +240,16 @@ model RateLimit {
 model Client {
   id                       Int      @id @default(autoincrement())
   name                     String
+  /// How a client is told apart from the other three of the same name. In
+  /// this jurisdiction a person is named with their father's, on the file
+  /// and at the bar, and a chamber that keeps only the given name loses
+  /// them.
+  fatherName               String   @default("") @map("father_name")
+  /// The national identity number. Kept as written, not validated: a
+  /// chamber records what the client's card says, and an old card, a
+  /// smudged photocopy and a number given over the telephone all have to
+  /// go in. It is also how a client is looked up.
+  cnic                     String   @default("")
   phone                    String   @default("")
   email                    String   @default("")
   address                  String   @default("")
@@ -259,6 +270,7 @@ model Client {
 
   cases          Case[]
   communications Communication[]
+  tasks          DiaryTask[]
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
@@ -269,25 +281,55 @@ model Client {
 }
 
 model Case {
-  id          Int       @id @default(autoincrement())
-  clientId    Int       @map("client_id")
-  title       String
-  court       String    @default("")
-  caseType    String    @default("") @map("case_type")
-  status      String    @default("Active")
-  nextHearing DateTime? @map("next_hearing") @db.Date
+  id            Int       @id @default(autoincrement())
+  clientId      Int       @map("client_id")
+  /// Written as the parties: "X vs Y". That is how a matter is spoken of
+  /// in court and how an advocate looks for it.
+  title         String
+  /// The number the court calls it by. Free text because a number is a
+  /// number in one court, and a number with a year, a class and a suffix
+  /// in the next.
+  caseNo        String    @default("") @map("case_no")
+  court         String    @default("")
+  caseType      String    @default("") @map("case_type")
+  /// The provisions the matter turns on.
+  sections      String    @default("")
+  /// The FIR, for a criminal matter: its number, the police station, the
+  /// date — as the file records them.
+  firDetails    String    @default("") @map("fir_details")
+  /// Which side this chamber is on — petitioner, respondent, complainant,
+  /// accused. Free text, because the word changes with the forum.
+  ourSide       String    @default("") @map("our_side")
+  /// The party on the other side, which is not always the same as the
+  /// second half of the title.
+  opposingParty String    @default("") @map("opposing_party")
+  /// The judge or bench it is before.
+  judge         String    @default("")
+  /// Where the matter has reached — framing of issues, evidence,
+  /// arguments, reserved. Distinct from status: a case may be Active and
+  /// at evidence, or Active and reserved.
+  stage         String    @default("")
+  status        String    @default("Active")
+  /// When it was instituted.
+  filedOn       DateTime? @map("filed_on") @db.Date
+  nextHearing   DateTime? @map("next_hearing") @db.Date
+  /// Who in the chamber is carrying it.
+  assignedTo    String    @default("") @map("assigned_to")
   /// Internal only — never shown to the client portal.
-  notes       String    @default("")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  notes         String    @default("")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  hearings  Hearing[]
-  updates   CaseUpdate[]
-  messages  CaseMessage[]
-  documents Document[]
-  fees      Fee[]
-  research  Research[]
+  client         Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  hearings       Hearing[]
+  updates        CaseUpdate[]
+  messages       CaseMessage[]
+  documents      Document[]
+  fees           Fee[]
+  research       Research[]
+  tasks          DiaryTask[]
+  expenses       Expense[]
+  communications Communication[]
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
@@ -297,6 +339,48 @@ model Case {
   @@map("cases")
 }
 
+/// A thing to be done, with or without a court date behind it.
+///
+/// The chamber's diary is not the cause list. The cause list is what the
+/// courts have fixed; this is everything else an advocate must not forget —
+/// file the rejoinder, collect the certified copy, telephone the client
+/// before the date, pay the process fee. It is the half of the day that has
+/// no hearing attached to it, and a practice is lost through this half
+/// rather than through the listed one.
+model DiaryTask {
+  id        Int       @id @default(autoincrement())
+  /// The day it is to be done. A task with a date in the past and `done`
+  /// still false is what "overdue" means; nothing else marks it.
+  taskDate  DateTime  @map("task_date") @db.Date
+  title     String
+  notes     String    @default("")
+  /// How much it matters. Free text rather than an enum: a chamber's own
+  /// words for urgency outlive any list decided here.
+  priority  String    @default("Normal")
+  /// What it is about. Either, both or neither — a task may hang off a
+  /// matter, off a person, or off nothing at all.
+  caseId    Int?      @map("case_id")
+  clientId  Int?      @map("client_id")
+  done      Boolean   @default(false)
+  doneAt    DateTime? @map("done_at")
+  /// Who wrote it down, so a chamber of three can tell whose it was.
+  createdBy String    @default("") @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  case   Case?   @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId, taskDate])
+  @@index([firmId, done])
+  @@index([caseId])
+  @@index([clientId])
+  @@map("diary_tasks")
+}
+
 model Hearing {
   id             Int       @id @default(autoincrement())
   caseId         Int       @map("case_id")
@@ -304,6 +388,16 @@ model Hearing {
   purpose        String    @default("")
   /// Internal only — never shown to the client portal.
   outcome        String    @default("")
+  /// What the court actually wrote, copied from the order sheet. Kept
+  /// apart from `outcome`, which is the chamber's own note of what
+  /// happened: one is the record, the other is the reading of it.
+  orderSheet     String    @default("") @map("order_sheet")
+  /// Who appeared. Often not the advocate whose file it is.
+  attendedBy     String    @default("") @map("attended_by")
+  /// The date the court gave from the bench. Recording it moves the
+  /// case's next hearing, which is why a hearing can be entered once and
+  /// the cause list is right afterwards.
+  nextDate       DateTime? @map("next_date") @db.Date
   /// When the reminder for this hearing went out, so a re-run of the
   /// reminder job never tells anyone twice.
   reminderSentAt DateTime? @map("reminder_sent_at")
@@ -394,7 +488,15 @@ model Fee {
   kind      String // "agreed" | "received"
   amount    Decimal  @db.Decimal(12, 2)
   entryDate DateTime @map("entry_date") @db.Date
+  /// Cash, bank, cheque, easypaisa. Free text: how money reaches a chamber
+  /// changes faster than any list written here would.
+  mode      String   @default("")
+  /// The receipt the client was given. This is the number a client quotes
+  /// when they say they have already paid.
+  receiptNo String   @default("") @map("receipt_no")
   note      String   @default("")
+  /// Who entered it, so a chamber of three can account for its own books.
+  createdBy String   @default("") @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -408,13 +510,23 @@ model Fee {
 }
 
 model OfficialFee {
-  id        Int      @id @default(autoincrement())
-  caseId    Int?     @map("case_id")
-  kind      String
-  amount    Decimal  @db.Decimal(12, 2)
-  entryDate DateTime @map("entry_date") @db.Date
-  note      String   @default("")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          Int       @id @default(autoincrement())
+  caseId      Int?      @map("case_id")
+  kind        String
+  description String    @default("")
+  amount      Decimal   @db.Decimal(12, 2)
+  entryDate   DateTime  @map("entry_date") @db.Date
+  receiptNo   String    @default("") @map("receipt_no")
+  /// Whether the chamber laid this out or the client paid it directly.
+  /// Money the chamber advanced is money owed back, and that is the whole
+  /// reason this is recorded apart from a professional fee.
+  paidBy      String    @default("office") @map("paid_by")
+  /// When the chamber got it back. Null while it is still out of pocket,
+  /// which is what makes a list of unrecovered court fees possible.
+  recoveredAt DateTime? @map("recovered_at")
+  note        String    @default("")
+  createdBy   String    @default("") @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
@@ -429,12 +541,22 @@ model Expense {
   amount      Decimal  @db.Decimal(12, 2)
   expenseDate DateTime @map("expense_date") @db.Date
   description String   @default("")
+  /// Who received it — the stationer, the clerk, the courier.
+  paidTo      String   @default("") @map("paid_to")
+  mode        String   @default("")
+  /// An expense may belong to a matter, and then it is recoverable; or to
+  /// the office, and then it is simply the cost of keeping the doors open.
+  caseId      Int?     @map("case_id")
+  createdBy   String   @default("") @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
+
+  case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
   @@index([firmId])
+  @@index([caseId])
   @@map("expenses")
 }
 
@@ -443,15 +565,32 @@ model Expense {
 // ---------------------------------------------------------------------------
 
 model Communication {
-  id          Int       @id @default(autoincrement())
-  clientId    Int?      @map("client_id")
-  method      String // "call" | "email" | "in_person"
-  summary     String
-  commDate    DateTime  @map("comm_date") @db.Date
-  followUpDue DateTime? @map("follow_up_due") @db.Date
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id           Int       @id @default(autoincrement())
+  clientId     Int?      @map("client_id")
+  /// A call about a matter belongs to the matter, not only to the person.
+  caseId       Int?      @map("case_id")
+  method       String // "call" | "email" | "in_person"
+  /// Who rang whom. A chamber defending what it advised needs to be able
+  /// to say the client telephoned it, or that it telephoned the client.
+  direction    String    @default("Received")
+  /// The person at the other end, who is very often not the client: the
+  /// opposing counsel, a reader, a relative bringing a message.
+  personName   String    @default("") @map("person_name")
+  personNumber String    @default("") @map("person_number")
+  /// What they were — client, opposing counsel, court staff, witness.
+  personRole   String    @default("") @map("person_role")
+  subject      String    @default("")
+  summary      String
+  commDate     DateTime  @map("comm_date") @db.Date
+  /// The hour it happened. Kept as written rather than as a timestamp: a
+  /// note made in the evening about a call at eleven should say eleven.
+  commTime     String    @default("") @map("comm_time")
+  followUpDue  DateTime? @map("follow_up_due") @db.Date
+  createdBy    String    @default("") @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case   Case?   @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
