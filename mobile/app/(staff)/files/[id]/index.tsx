@@ -137,23 +137,72 @@ export default function OfficeCaseFile() {
     <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerClassName="gap-6 p-4 pb-12">
         <View className="gap-2 rounded-card border border-rule bg-surface p-4">
+          {/* The number first, because it is what the matter is called at
+              the counter and in the cause list, and an advocate checking
+              they have the right file looks for it before the title. */}
+          {/* Not uppercased, though every other label on this screen is.
+              A case number is a citation: "Suit 512/2026" is how it is
+              written on the file and how the court writes it back, and
+              shouting it in capitals changes what the advocate typed. */}
+          {data.caseNo ? (
+            <Text className="text-xs font-semibold tracking-[1.5px] text-gold">{data.caseNo}</Text>
+          ) : null}
           <Text className="text-lg font-semibold leading-7 text-ink">{data.title}</Text>
           {data.court ? <Text className="text-sm text-ink-soft">{data.court}</Text> : null}
+          {data.judge ? <Text className="text-sm text-ink-soft">{data.judge}</Text> : null}
+
           <View className="flex-row flex-wrap gap-2 pt-1">
             <View className="rounded-full bg-gold-wash px-2.5 py-0.5">
               <Text className="text-[11px] font-semibold text-gold">{data.status}</Text>
             </View>
+            {data.stage ? (
+              <View className="rounded-full bg-gold-wash px-2.5 py-0.5">
+                <Text className="text-[11px] font-semibold text-gold">{data.stage}</Text>
+              </View>
+            ) : null}
             {data.caseType ? (
               <View className="rounded-full bg-gold-wash px-2.5 py-0.5">
                 <Text className="text-[11px] font-semibold text-gold">{data.caseType}</Text>
               </View>
             ) : null}
           </View>
+
+          {data.ourSide || data.opposingParty ? (
+            <Text className="pt-1 text-sm leading-6 text-ink-soft">
+              {data.ourSide ? (
+                <Text>
+                  We are <Text className="font-semibold text-ink">{data.ourSide}</Text>
+                </Text>
+              ) : null}
+              {data.ourSide && data.opposingParty ? " · " : null}
+              {data.opposingParty ? (
+                <Text>
+                  Against <Text className="font-semibold text-ink">{data.opposingParty}</Text>
+                </Text>
+              ) : null}
+            </Text>
+          ) : null}
+
+          {data.sections ? (
+            <Text className="text-sm leading-6 text-ink-soft">{data.sections}</Text>
+          ) : null}
+          {data.firDetails ? (
+            <Text className="text-sm leading-6 text-ink-soft">{data.firDetails}</Text>
+          ) : null}
+
           {data.nextHearing && (
             <Text className="pt-1 text-sm text-ink">
               Next hearing <Text className="font-semibold">{formatDate(data.nextHearing)}</Text>
             </Text>
           )}
+
+          {data.filedOn || data.assignedTo ? (
+            <Text className="text-xs leading-5 text-ink-soft">
+              {data.filedOn ? `Filed ${formatDate(data.filedOn)}` : ""}
+              {data.filedOn && data.assignedTo ? " · " : ""}
+              {data.assignedTo ? `Carried by ${data.assignedTo}` : ""}
+            </Text>
+          ) : null}
 
           {mayEdit || mayList ? (
             <View className="flex-row gap-2 pt-2">
@@ -220,11 +269,28 @@ export default function OfficeCaseFile() {
                 <Text className="flex-1 text-sm text-ink-soft">{h.purpose || "Hearing"}</Text>
               </View>
 
+              {/* The court's own words, set apart so they are not read as
+                  the chamber's. One is the record; the other is the
+                  reading of it, and an advocate quoting the wrong one at
+                  the next date would be quoting themselves. */}
+              {h.orderSheet ? (
+                <View className="gap-1 rounded-card border-l-2 border-l-gold bg-gold-wash px-3 py-2">
+                  <Text className="text-[10px] font-semibold uppercase tracking-wider text-gold">
+                    Order sheet
+                  </Text>
+                  <Text className="text-sm leading-5 text-ink">{h.orderSheet}</Text>
+                </View>
+              ) : null}
+
               {h.outcome ? (
                 <Text className="text-sm leading-5 text-ink">{h.outcome}</Text>
               ) : (
                 <Text className="text-xs text-ink-soft">No outcome recorded.</Text>
               )}
+
+              {h.attendedBy ? (
+                <Text className="text-xs text-ink-soft">Appeared: {h.attendedBy}</Text>
+              ) : null}
 
               {can(account, "hearings.edit") &&
                 (openHearing === h.id ? (

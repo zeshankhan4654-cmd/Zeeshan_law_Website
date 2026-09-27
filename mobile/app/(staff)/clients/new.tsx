@@ -18,6 +18,8 @@ export default function NewClient() {
   const create = useCreateClient();
 
   const [name, setName] = useState("");
+  const [fatherName, setFatherName] = useState("");
+  const [cnic, setCnic] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
@@ -31,6 +33,8 @@ export default function NewClient() {
     try {
       const client = await create.mutateAsync({
         name: name.trim(),
+        fatherName: fatherName.trim(),
+        cnic: cnic.trim(),
         phone: phone.trim(),
         email: email.trim(),
         address: address.trim(),
@@ -52,6 +56,22 @@ export default function NewClient() {
       keyboardShouldPersistTaps="handled"
     >
       <Field label="Name" value={name} onChange={setName} placeholder="As it appears on the file" />
+      <Field
+        label="Father's name"
+        value={fatherName}
+        onChange={setFatherName}
+        placeholder="Walid"
+        hint="How a person is named on the file and at the bar."
+      />
+      <Field
+        label="CNIC"
+        value={cnic}
+        onChange={setCnic}
+        placeholder="17301-1234567-9"
+        keyboardType="phone-pad"
+        autoCapitalize="none"
+        hint="Exactly as the card reads. It is not checked — an old card or a number given over the telephone still has to go in, and it is how this client is found later."
+      />
       <Field
         label="Telephone"
         value={phone}

@@ -6,6 +6,10 @@ import { useAuthToken } from "./session";
 export type ClientSummary = {
   id: number;
   name: string;
+  /** How a person is named on the file and at the bar. */
+  fatherName: string;
+  /** The number on their card, as written. Also how they are looked up. */
+  cnic: string;
   phone: string;
   email: string;
   portalEnabled: boolean;
@@ -24,6 +28,8 @@ export type ClientCase = {
 export type ClientFile = {
   id: number;
   name: string;
+  fatherName: string;
+  cnic: string;
   phone: string;
   email: string;
   address: string;
@@ -38,6 +44,8 @@ export type ClientFile = {
 
 export type NewClient = {
   name: string;
+  fatherName: string;
+  cnic: string;
   phone: string;
   email: string;
   address: string;

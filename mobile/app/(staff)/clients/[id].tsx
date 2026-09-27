@@ -53,6 +53,12 @@ export default function ClientFileScreen() {
     <ScrollView contentContainerClassName="gap-5 p-4 pb-10">
       <View className="gap-1">
         <Text className="text-xl font-semibold leading-7 text-ink">{client.name}</Text>
+        {client.fatherName ? (
+          <Text className="text-sm text-ink-soft">s/o {client.fatherName}</Text>
+        ) : null}
+        {client.cnic ? (
+          <Text className="text-sm tracking-wide text-ink-soft">{client.cnic}</Text>
+        ) : null}
         <Text className="text-xs text-ink-soft">
           With the chamber since {formatDate(client.createdAt)}
         </Text>

@@ -120,18 +120,30 @@ const DEMO_TASKS = [
 
 const CASE_DETAIL = {
   id: 1,
-  title: "Criminal Appeal against conviction",
+  title: "The State vs Sher Afzal Khan",
+  caseNo: "Cr.A. 412/2026",
   court: "Peshawar High Court",
   caseType: "Criminal Appeal",
+  sections: "Section 302, Pakistan Penal Code",
+  firDetails: "FIR 214/2025, Police Station Gulbahar, 4 May 2025",
+  ourSide: "Appellant",
+  opposingParty: "The State",
+  judge: "Mr Justice Tanzeel ur Rehman",
+  stage: "Arguments",
+  filedOn: day(-120),
+  assignedTo: "Sadeeq",
   status: "Active",
   nextHearing: day(0),
   notes: "INTERNAL: strategy note. Never visible in the client's portal.",
   createdAt: day(-120),
   client: { id: 1, name: "Fazal ur Rehman", phone: "", email: "" },
   hearings: [
-    { id: 1, hearingDate: day(0), purpose: "Arguments on the appeal", outcome: "" },
+    { id: 1, hearingDate: day(0), purpose: "Arguments on the appeal", outcome: "",
+      orderSheet: "", attendedBy: "", nextDate: null },
     { id: 4, hearingDate: day(-24), purpose: "Framing of issues",
-      outcome: "INTERNAL: adjourned, opposing counsel unprepared." },
+      outcome: "INTERNAL: adjourned, opposing counsel unprepared.",
+      orderSheet: "INTERNAL: adjourned at the respondent's request. To come up for issues.",
+      attendedBy: "Sadeeq", nextDate: day(0) },
   ],
   updates: [
     { id: 1, updateDate: day(-6), author: "zeshan.khan",
@@ -162,9 +174,12 @@ const PORTAL_CASES = [
 
 /** The canned answer for a path, or undefined if this path is not demoed. */
 const DEMO_CLIENTS = [
-  { id: 1, name: "Fazal ur Rehman", phone: "0300 1234567", email: "", portalEnabled: true, portalUsername: "fazal.rehman", caseCount: 2 },
-  { id: 2, name: "Rukhsana Bibi", phone: "0311 7654321", email: "", portalEnabled: false, portalUsername: null, caseCount: 1 },
-  { id: 3, name: "Sher Afzal Khan", phone: "0345 2223334", email: "sher@example.com", portalEnabled: true, portalUsername: "sher.afzal", caseCount: 1 },
+  { id: 1, name: "Fazal ur Rehman", fatherName: "Abdul Rehman", cnic: "17301-1234567-9",
+    phone: "0300 1234567", email: "", portalEnabled: true, portalUsername: "fazal.rehman", caseCount: 2 },
+  { id: 2, name: "Rukhsana Bibi", fatherName: "Gul Muhammad", cnic: "17301-7654321-2",
+    phone: "0311 7654321", email: "", portalEnabled: false, portalUsername: null, caseCount: 1 },
+  { id: 3, name: "Sher Afzal Khan", fatherName: "Afzal Khan", cnic: "17301-2223334-5",
+    phone: "0345 2223334", email: "sher@example.com", portalEnabled: true, portalUsername: "sher.afzal", caseCount: 1 },
 ];
 
 export function demoResponse(path: string, method = "GET"): unknown {

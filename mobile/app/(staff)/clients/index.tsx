@@ -65,7 +65,15 @@ export default function Clients() {
                   </Text>
                 ) : null}
               </View>
+              {item.fatherName ? (
+                <Text className="text-sm text-ink-soft">s/o {item.fatherName}</Text>
+              ) : null}
               {item.phone ? <Text className="text-sm text-ink-soft">{item.phone}</Text> : null}
+              {/* Shown because it is searchable: a search by the number
+                  should show the number it matched. */}
+              {item.cnic ? (
+                <Text className="text-xs tracking-wide text-ink-soft">{item.cnic}</Text>
+              ) : null}
               <Text className="text-xs text-ink-soft">
                 {item.caseCount} {item.caseCount === 1 ? "matter" : "matters"}
               </Text>

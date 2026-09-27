@@ -34,6 +34,12 @@ export type OfficeHearing = {
   purpose: string;
   /** The office's own record of what happened. Never leaves the chamber. */
   outcome: string;
+  /** What the court wrote, copied down. Also never leaves the chamber. */
+  orderSheet: string;
+  /** Who appeared, which is often not the advocate whose file it is. */
+  attendedBy: string;
+  /** The date given from the bench, if one was. */
+  nextDate: string | null;
 };
 
 export type OfficeDocument = {
@@ -57,11 +63,26 @@ export type OfficeMessage = {
 
 export type OfficeCaseFile = {
   id: number;
+  /** The parties: "X vs Y", as the matter is called in court. */
   title: string;
+  /** What the court knows it by, and what is asked for at the counter. */
+  caseNo: string;
   court: string;
   caseType: string;
+  /** The provisions the matter turns on. */
+  sections: string;
+  /** For a criminal matter: the FIR, its police station and date. */
+  firDetails: string;
+  /** Petitioner, respondent, complainant, accused. */
+  ourSide: string;
+  opposingParty: string;
+  judge: string;
+  /** Where it has reached, which is not the same question as its status. */
+  stage: string;
   status: string;
+  filedOn: string | null;
   nextHearing: string | null;
+  assignedTo: string;
   /** The chamber's working note on the matter. */
   notes: string;
   createdAt: string;
@@ -187,12 +208,41 @@ export function dayHeading(isoDate: string): string {
 
 export type CaseDraft = {
   title: string;
+  caseNo: string;
   court: string;
   caseType: string;
+  sections: string;
+  firDetails: string;
+  ourSide: string;
+  opposingParty: string;
+  judge: string;
+  stage: string;
   status: string;
+  /** YYYY-MM-DD, or "" when it is not known. */
+  filedOn: string;
   /** YYYY-MM-DD, or "" for a matter with nothing listed yet. */
   nextHearing: string;
+  assignedTo: string;
   notes: string;
+};
+
+/** An empty matter, so the two forms that open one cannot drift apart. */
+export const EMPTY_CASE: CaseDraft = {
+  title: "",
+  caseNo: "",
+  court: "",
+  caseType: "",
+  sections: "",
+  firDetails: "",
+  ourSide: "",
+  opposingParty: "",
+  judge: "",
+  stage: "",
+  status: "Active",
+  filedOn: "",
+  nextHearing: "",
+  assignedTo: "",
+  notes: "",
 };
 
 export function useCreateCase() {
@@ -233,8 +283,22 @@ export function useEditCase(caseId: number) {
   });
 }
 
+/** What is written down about a hearing, whether before it or after it. */
+export type HearingDraft = {
+  hearingDate: string;
+  purpose: string;
+  /** The chamber's own note. Internal. */
+  outcome: string;
+  /** What the court wrote, copied down. Internal. */
+  orderSheet: string;
+  attendedBy: string;
+  /** The date given from the bench. Supplying it moves the cause list. */
+  nextDate: string | null;
+  setAsNext: boolean;
+};
+
 export function useAddHearing(caseId: number) {
-  return useCaseMutation<{ hearingDate: string; purpose: string; setAsNext: boolean }>(
+  return useCaseMutation<HearingDraft>(
     caseId,
     (token, body) =>
       apiFetch(`/api/office/cases/${caseId}/hearings`, {
