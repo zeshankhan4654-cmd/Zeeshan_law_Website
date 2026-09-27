@@ -159,6 +159,12 @@ export default function AccountScreen() {
           </Text>
           <Row
             icon={<CalendarDays size={20} color="#9a7622" />}
+            title="Your day"
+            subtitle="What is listed, what is to be done, and what is late"
+            onPress={() => router.push("/dashboard")}
+          />
+          <Row
+            icon={<CalendarDays size={20} color="#9a7622" />}
             title="Cause list"
             subtitle="What is listed today and the fortnight ahead"
             onPress={() => router.push("/diary")}

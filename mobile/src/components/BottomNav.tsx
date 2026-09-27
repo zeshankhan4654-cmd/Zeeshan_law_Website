@@ -70,10 +70,12 @@ const VISITOR: Item[] = [
 
 const STAFF: Item[] = [
   {
-    label: "Cause list",
-    href: "/diary",
+    // The day, not the cause list. The cause list is one tap from it, and
+    // five is already as many places as a phone's bar will carry.
+    label: "Today",
+    href: "/dashboard",
     icon: CalendarDays,
-    active: (p) => p.startsWith("/diary"),
+    active: (p) => p.startsWith("/dashboard") || p.startsWith("/diary"),
   },
   { label: "Cases", href: "/files", icon: FolderOpen, active: (p) => p.startsWith("/files") },
   { label: "Clients", href: "/clients", icon: Users, active: (p) => p.startsWith("/clients") },

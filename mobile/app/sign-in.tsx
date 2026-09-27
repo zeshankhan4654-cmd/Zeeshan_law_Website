@@ -100,7 +100,16 @@ export default function SignIn() {
       );
       setPassword("");
       // A password the office chose is not a password its holder chose.
-      router.replace(account.mustChangePassword ? "/change-password" : "/account");
+      // Otherwise straight to the work: an advocate signs in to see their
+      // day, and a client to see their matters. Neither signs in to read a
+      // page about their own account.
+      router.replace(
+        account.mustChangePassword
+          ? "/change-password"
+          : account.kind === "staff"
+            ? "/dashboard"
+            : "/cases"
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in.");
     } finally {

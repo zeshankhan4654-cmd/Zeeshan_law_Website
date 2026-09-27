@@ -79,6 +79,45 @@ const HEARINGS = [
     status: "Active", clientName: "Sher Afzal Khan", clientPhone: "" },
 ];
 
+const DEMO_TASKS = [
+  {
+    id: 1,
+    taskDate: day(-3),
+    title: "Collect the certified copy of the order",
+    notes: "The reader said it would be ready by Wednesday.",
+    priority: "Urgent",
+    done: false,
+    doneAt: null,
+    createdBy: "admin",
+    case: { id: 1, title: "Criminal Appeal against conviction", caseNo: "Cr.A. 412/2026" },
+    client: null,
+  },
+  {
+    id: 2,
+    taskDate: day(0),
+    title: "File the rejoinder",
+    notes: "",
+    priority: "Normal",
+    done: false,
+    doneAt: null,
+    createdBy: "admin",
+    case: { id: 2, title: "Family Suit for maintenance", caseNo: "" },
+    client: null,
+  },
+  {
+    id: 3,
+    taskDate: day(0),
+    title: "Pay the process fee",
+    notes: "",
+    priority: "Normal",
+    done: true,
+    doneAt: day(0),
+    createdBy: "admin",
+    case: null,
+    client: null,
+  },
+];
+
 const CASE_DETAIL = {
   id: 1,
   title: "Criminal Appeal against conviction",
@@ -316,6 +355,36 @@ export function demoResponse(path: string, method = "GET"): unknown {
       ],
     };
   }
+
+  // ---- the day, and the chamber's own diary ------------------------------
+  //
+  // Written to answer the same shape the API does, not the shape the screen
+  // happens to want. Demonstration data that agrees with the app rather than
+  // with the server hides the bug it is meant to expose — which is exactly
+  // how the site settings screen stayed broken.
+  if (p.startsWith("/api/office/dashboard"))
+    return {
+      from: day(0).slice(0, 10),
+      to: day(0).slice(0, 10),
+      counts: { hearings: 1, tasks: 2, overdue: 1, activeCases: 3 },
+      hearings: [{ ...HEARINGS[0], date: day(0).slice(0, 10), caseNo: "Cr.A. 412/2026", stage: "Arguments" }],
+      tasks: DEMO_TASKS.filter((t) => !t.done).slice(0, 1),
+      followUps: [
+        {
+          id: 1,
+          followUpDue: day(0),
+          subject: "Ring before the date",
+          summary: "Ask him to bring the original sale agreement to court.",
+          personName: "Fazal ur Rehman",
+          client: { id: 1, name: "Fazal ur Rehman" },
+        },
+      ],
+    };
+
+  if (p.startsWith("/api/office/tasks") && method === "POST") return { id: 99 };
+  if (p.startsWith("/api/office/tasks/")) return undefined;
+  if (p.startsWith("/api/office/tasks"))
+    return { items: DEMO_TASKS, overdue: DEMO_TASKS.filter((t) => !t.done && t.taskDate < day(0)).length };
 
   if (p === "/api/office/diary")
     return { days: [

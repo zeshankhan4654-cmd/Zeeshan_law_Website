@@ -27,6 +27,7 @@ export default function StaffLayout() {
         contentStyle: { backgroundColor: "#faf8f5" },
       }}
     >
+      <Stack.Screen name="dashboard" options={{ title: "Your day" }} />
       <Stack.Screen name="diary" options={{ title: "Cause list" }} />
       <Stack.Screen name="files/index" options={{ title: "Cases" }} />
       <Stack.Screen name="files/new" options={{ title: "New matter" }} />
