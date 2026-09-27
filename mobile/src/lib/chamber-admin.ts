@@ -77,11 +77,30 @@ export function useIssuePassword() {
   );
 }
 
+/**
+ * The chamber's public details.
+ *
+ * The API answers `{ settings, defaults }` — the values this chamber has
+ * set, and what the site falls back to for the ones it has not. Only the
+ * first is wanted here, so `select` unwraps it and the screen goes on
+ * receiving a plain map.
+ *
+ * Read as the whole response for a while, which typed as a map without
+ * complaint and left every field on the screen blank however much the
+ * chamber had filled in: the keys were one level down. Nothing caught it
+ * because the demonstration data answered with a flat map — the shape the
+ * app expected rather than the shape the API sends.
+ */
 export function useSiteSettings() {
   const token = useAuthToken();
   return useQuery({
     queryKey: ["office", "settings"],
-    queryFn: () => apiFetch<Record<string, string>>("/api/office/settings", { token }),
+    queryFn: () =>
+      apiFetch<{ settings: Record<string, string>; defaults: Record<string, string> }>(
+        "/api/office/settings",
+        { token }
+      ),
+    select: (response) => response.settings,
     enabled: token !== null,
   });
 }
@@ -91,8 +110,11 @@ export function useSaveSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: Record<string, string>) =>
+      // PUT, which is what the endpoint serves and what the website sends.
+      // PATCH reached no route at all, so saving from the app answered 404
+      // — again invisible behind demonstration data, which accepts any verb.
       apiFetch<Record<string, string>>("/api/office/settings", {
-        method: "PATCH",
+        method: "PUT",
         token,
         body: JSON.stringify(body),
       }),

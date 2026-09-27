@@ -182,15 +182,26 @@ export function demoResponse(path: string, method = "GET"): unknown {
       allCaps: ["cases.view", "cases.edit", "clients.view", "clients.edit", "money.view", "money.edit"],
     };
 
+  // Wrapped in `settings`, because that is what the API answers. It used to
+  // be returned flat, which is the shape the app wanted rather than the
+  // shape it would get, and the settings screen was broken against a real
+  // server for as long as only this was ever run.
   if (p === "/api/office/settings")
     return {
-      "firm.name": "Your Chamber",
-      "firm.address": "Peshawar High Court, Peshawar",
-      "firm.hours": "Monday to Saturday, 9am – 6pm",
-      "contact.phone": "",
-      "contact.phone2": "",
-      "contact.email": "",
-      "contact.whatsapp": "",
+      settings: {
+        "firm.name": "Your Chamber",
+        "firm.address": "Peshawar High Court, Peshawar",
+        "firm.hours": "Monday to Saturday, 9am – 6pm",
+        "contact.phone": "",
+        "contact.phone2": "",
+        "contact.email": "",
+        "contact.whatsapp": "",
+      },
+      defaults: {
+        "firm.name": "The Arbitrator & Law Associates",
+        "firm.address": "Peshawar High Court, Peshawar, Khyber Pakhtunkhwa",
+        "firm.hours": "Monday to Saturday, 9am – 6pm",
+      },
     };
 
   // --- the chamber's own library ------------------------------------------
