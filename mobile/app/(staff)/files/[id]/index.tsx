@@ -29,6 +29,7 @@ import {
   useEditHearing,
   useReplyToClient,
 } from "@/lib/office";
+import { AddDocument } from "@/components/AddDocument";
 import { HearingEdit } from "@/components/HearingEdit";
 import { statementUrl, useStatementLink, whatsappUrl } from "@/lib/money";
 import { formatDate, formatRupees } from "@/lib/portal";
@@ -407,6 +408,8 @@ export default function OfficeCaseFile() {
         </Section>
 
         <Section icon={<FileText size={15} color="#9a7622" />} title="Documents">
+          {can(account, "documents.edit") ? <AddDocument caseId={caseId} /> : null}
+
           {data.documents.length === 0 ? (
             <View className="rounded-card border border-rule bg-surface p-4">
               <Text className="text-sm text-ink-soft">Nothing on file yet.</Text>

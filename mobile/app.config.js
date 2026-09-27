@@ -98,22 +98,26 @@ module.exports = {
     /**
      * Permissions the build must not ask for.
      *
-     * Each of these is added to the manifest by a library rather than by us,
-     * and none is needed: the voice note in a client's case thread is
-     * recorded into the app's own cache directory, which needs no storage
-     * permission on any Android this build runs on, and nothing here draws
-     * over other apps. React Native declares SYSTEM_ALERT_WINDOW for its
-     * developer menu, which a release build has no use for.
+     * An app should ask for what it uses and nothing else, and the Play
+     * Console asks a chamber to justify each of these by name.
      *
-     * Listing them here removes them from the merged manifest. Worth doing
-     * for its own sake — an app should ask for what it uses — and worth
-     * doing before a store review, because the Play Console asks an
-     * advocate's chamber to justify exactly these three, and the honest
-     * answer is that it does not use them.
+     * SYSTEM_ALERT_WINDOW is React Native's, for its developer menu, which
+     * a release build has no use for. WRITE_EXTERNAL_STORAGE is declared by
+     * the image picker and is legacy: nothing here writes outside the app's
+     * own directories on any Android this build runs on.
+     *
+     * READ_EXTERNAL_STORAGE was blocked too and is no longer, because the
+     * picker now exists and declares it for itself. On Android 13 and later
+     * the system photo picker needs no permission at all and this one is
+     * ignored; on Android 12 and earlier it is how a file is chosen, and
+     * stripping a permission a library says it needs would have left
+     * "choose a file" doing nothing on an older handset — which is not a
+     * thing this machine can test for, and so not a thing to be clever
+     * about. One declared permission that newer Androids ignore is the
+     * cheaper mistake.
      */
     blockedPermissions: [
       "android.permission.SYSTEM_ALERT_WINDOW",
-      "android.permission.READ_EXTERNAL_STORAGE",
       "android.permission.WRITE_EXTERNAL_STORAGE",
     ],
     /**
@@ -186,6 +190,17 @@ module.exports = {
       {
         icon: "./assets/adaptive-icon.png",
         color: "#9a7622",
+      },
+    ],
+    [
+      "expo-image-picker",
+      {
+        // Shown in the system dialogue, so it is written for the person
+        // holding the telephone rather than for the developer.
+        cameraPermission:
+          "Allow the chamber to use the camera so a document can be photographed onto a case file.",
+        photosPermission:
+          "Allow the chamber to choose a picture so it can be put on a case file.",
       },
     ],
     [
