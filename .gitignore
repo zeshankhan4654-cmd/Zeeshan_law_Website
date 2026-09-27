@@ -44,4 +44,6 @@ npm-debug.log*
 # Expo
 mobile/.expo/
 mobile/dist/
+# The same export built with demonstration data, for a link someone can open.
+mobile/dist-demo/
 mobile/expo-env.d.ts

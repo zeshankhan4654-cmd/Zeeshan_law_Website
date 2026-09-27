@@ -16,6 +16,7 @@ import { officeRouter } from "./routes/office.route.js";
 import { portalCasesRouter } from "./routes/portal-cases.route.js";
 import { platformRouter } from "./routes/platform.route.js";
 import { portalRouter } from "./routes/portal.route.js";
+import { privacyRouter } from "./routes/privacy.route.js";
 import { signupRouter } from "./routes/signup.route.js";
 import { siteRouter } from "./routes/site.route.js";
 
@@ -78,6 +79,13 @@ export function createApp(): Express {
   app.use("/api/portal", portalCasesRouter);
   app.use("/api/signup", signupRouter);
   app.use("/api/site", siteRouter);
+
+  /**
+   * Not under /api, because this one is for a person to read rather than
+   * for the app to fetch: an app store reviewer opens it in a browser, and
+   * the address goes in the store listing. See routes/privacy.route.ts.
+   */
+  app.use("/privacy", privacyRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

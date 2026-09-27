@@ -15,9 +15,16 @@
 export function Reveal({
   children,
   className = "",
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** An anchor target, for a section something links straight to. */
+  id?: string;
 }) {
-  return <div className={`reveal ${className}`}>{children}</div>;
+  return (
+    <div id={id} className={`reveal ${className}`}>
+      {children}
+    </div>
+  );
 }

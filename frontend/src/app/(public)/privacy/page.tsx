@@ -126,6 +126,27 @@ export default async function Privacy() {
           </p>
         </Reveal>
 
+        <Reveal id="deletion" className="space-y-4">
+          <h2 className="font-display text-2xl font-medium text-ink">Deleting an account</h2>
+          <p className="leading-7 text-ink-soft">
+            A client who wants their portal sign-in closed asks their own chamber, at the details
+            below. The chamber closes it, and the client keeps the right to a copy of what is held
+            first.
+          </p>
+          <p className="leading-7 text-ink-soft">
+            An advocate who wants their chamber removed from Lawyer360 — the account and the
+            records inside it — asks at the address in the app&rsquo;s store listing. The chamber
+            is deleted with everything in it: its clients, its files, its diary and its fees.
+          </p>
+          <p className="leading-7 text-ink-soft">
+            Two things survive a deletion, and a chamber should know both before asking. Nightly
+            backups are kept for thirty days, so a deleted record can exist in a backup for up to a
+            month before it ages out. And where the chamber is under a duty to retain a file — a
+            live matter, or a duty to account for advice given — that file is kept, and the chamber
+            says which duty it relies on.
+          </p>
+        </Reveal>
+
         <Reveal className="space-y-4">
           <h2 className="font-display text-2xl font-medium text-ink">Asking what is held</h2>
           <p className="leading-7 text-ink-soft">
