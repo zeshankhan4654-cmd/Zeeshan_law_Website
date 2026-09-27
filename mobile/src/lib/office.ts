@@ -178,15 +178,6 @@ export function useReplyToClient(caseId: number) {
   );
 }
 
-export function useRecordOutcome(caseId: number) {
-  return useCaseMutation<{ hearingId: number; outcome: string }>(caseId, (token, { hearingId, outcome }) =>
-    apiFetch(`/api/office/hearings/${hearingId}/outcome`, {
-      method: "POST",
-      token,
-      body: JSON.stringify({ outcome }),
-    })
-  );
-}
 
 /** "Today", "Tomorrow", or "Mon 5 Oct" — how a cause list is actually read. */
 export function dayHeading(isoDate: string): string {
@@ -296,6 +287,30 @@ export type HearingDraft = {
   nextDate: string | null;
   setAsNext: boolean;
 };
+
+/**
+ * Correcting a hearing, and removing one entered in error.
+ *
+ * The correction sends only the fields that changed, so a form opened and
+ * half-read cannot blank what it did not touch.
+ */
+export function useEditHearing(caseId: number) {
+  return useCaseMutation<{ hearingId: number; changes: Record<string, string> }>(
+    caseId,
+    (token, { hearingId, changes }) =>
+      apiFetch(`/api/office/hearings/${hearingId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(changes),
+      })
+  );
+}
+
+export function useDeleteHearing(caseId: number) {
+  return useCaseMutation<number>(caseId, (token, hearingId) =>
+    apiFetch(`/api/office/hearings/${hearingId}`, { method: "DELETE", token })
+  );
+}
 
 export function useAddHearing(caseId: number) {
   return useCaseMutation<HearingDraft>(

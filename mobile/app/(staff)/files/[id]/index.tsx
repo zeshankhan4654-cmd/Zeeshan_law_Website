@@ -25,9 +25,11 @@ import {
 import {
   useOfficeCase,
   usePostUpdate,
-  useRecordOutcome,
+  useDeleteHearing,
+  useEditHearing,
   useReplyToClient,
 } from "@/lib/office";
+import { HearingEdit } from "@/components/HearingEdit";
 import { statementUrl, useStatementLink, whatsappUrl } from "@/lib/money";
 import { formatDate, formatRupees } from "@/lib/portal";
 import { can, useSession } from "@/lib/session";
@@ -101,12 +103,13 @@ export default function OfficeCaseFile() {
   const { data, isPending, isError, error } = useOfficeCase(caseId);
   const postUpdate = usePostUpdate(caseId);
   const reply = useReplyToClient(caseId);
-  const recordOutcome = useRecordOutcome(caseId);
 
   const [openHearing, setOpenHearing] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [statementProblem, setStatementProblem] = useState<string | null>(null);
   const statement = useStatementLink();
+  const editHearing = useEditHearing(caseId);
+  const deleteHearing = useDeleteHearing(caseId);
 
   if (isPending) {
     return (
@@ -327,18 +330,25 @@ export default function OfficeCaseFile() {
 
               {can(account, "hearings.edit") &&
                 (openHearing === h.id ? (
-                  <Composer
-                    placeholder="What happened?"
-                    busy={recordOutcome.isPending}
-                    onSubmit={async (outcome) => {
-                      await run(recordOutcome.mutateAsync({ hearingId: h.id, outcome }));
+                  <HearingEdit
+                    hearing={h}
+                    busy={editHearing.isPending || deleteHearing.isPending}
+                    onCancel={() => setOpenHearing(null)}
+                    onSave={async (changes) => {
+                      if (Object.keys(changes).length > 0) {
+                        await run(editHearing.mutateAsync({ hearingId: h.id, changes }));
+                      }
+                      setOpenHearing(null);
+                    }}
+                    onDelete={async () => {
+                      await run(deleteHearing.mutateAsync(h.id));
                       setOpenHearing(null);
                     }}
                   />
                 ) : (
                   <Pressable onPress={() => setOpenHearing(h.id)} hitSlop={6}>
                     <Text className="text-xs font-semibold text-gold">
-                      {h.outcome ? "Change the outcome" : "Record the outcome"}
+                      {h.outcome || h.orderSheet ? "Correct this hearing" : "Write it up"}
                     </Text>
                   </Pressable>
                 ))}

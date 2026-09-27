@@ -26,6 +26,34 @@ export const caseUpdateSchema = Joi.object({
 export type CaseUpdateInput = { message: string; updateDate: Date };
 
 /** What actually happened at a hearing. Internal — never shown to a client. */
+/**
+ * Correcting a hearing after the fact.
+ *
+ * Every field optional and at least one required, because this is used one
+ * field at a time: the order sheet copied out properly that evening, a
+ * purpose mistyped in a corridor, a date the court gave that was misheard.
+ * A hearing written up in two minutes outside a courtroom is worth having
+ * and is not always right, and a record that cannot be corrected stops
+ * being written.
+ */
+export const hearingEditSchema = Joi.object({
+  hearingDate: Joi.date().iso(),
+  purpose: Joi.string().trim().allow("").max(300),
+  outcome: Joi.string().trim().allow("").max(4000),
+  orderSheet: Joi.string().trim().allow("").max(8000),
+  attendedBy: Joi.string().trim().allow("").max(120),
+  nextDate: Joi.date().iso().allow(null, ""),
+}).min(1);
+
+export type HearingEditInput = {
+  hearingDate?: Date;
+  purpose?: string;
+  outcome?: string;
+  orderSheet?: string;
+  attendedBy?: string;
+  nextDate?: Date | null | "";
+};
+
 export const hearingOutcomeSchema = Joi.object({
   outcome: Joi.string().trim().allow("").max(4000).required(),
 });

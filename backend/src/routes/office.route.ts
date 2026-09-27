@@ -21,11 +21,13 @@ import {
   caseListSchema,
   caseUpdateSchema,
   diarySchema,
+  hearingEditSchema,
   hearingOutcomeSchema,
   officeReplySchema,
   type CaseListQuery,
   type CaseUpdateInput,
   type DiaryQuery,
+  type HearingEditInput,
   type HearingOutcomeInput,
   type OfficeReplyInput,
 } from "../validation/office.schema.js";
@@ -344,6 +346,82 @@ officeRouter.post(
 );
 
 /** What happened at a hearing. Internal: the client never sees this. */
+/**
+ * Correcting a hearing, and removing one entered in error.
+ *
+ * The next date is the part that has to be handled rather than just
+ * stored: moving it here has to move what the cause list says, or the
+ * correction is only half made and the client is told the old date. It is
+ * applied only when this hearing is the one the case is presently looking
+ * at — a correction to last month's hearing must not drag the matter's
+ * next date backwards on top of a later one already fixed.
+ */
+officeRouter.patch(
+  "/hearings/:id",
+  requireCap("hearings.edit"),
+  validate(hearingEditSchema),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const hearingId = parseId(req.params.id);
+    const body = req.body as HearingEditInput;
+
+    const existing = await db.hearing.findUnique({
+      where: { id: hearingId },
+      select: { id: true, caseId: true, nextDate: true },
+    });
+    if (!existing) throw new ApiError(404, "No such hearing.");
+
+    const nextDate =
+      body.nextDate === undefined ? undefined : body.nextDate === "" ? null : body.nextDate;
+
+    await db.hearing.update({
+      where: { id: hearingId },
+      data: {
+        ...(body.hearingDate !== undefined ? { hearingDate: body.hearingDate } : {}),
+        ...(body.purpose !== undefined ? { purpose: body.purpose } : {}),
+        ...(body.outcome !== undefined ? { outcome: body.outcome } : {}),
+        ...(body.orderSheet !== undefined ? { orderSheet: body.orderSheet } : {}),
+        ...(body.attendedBy !== undefined ? { attendedBy: body.attendedBy } : {}),
+        ...(nextDate !== undefined ? { nextDate } : {}),
+      },
+    });
+
+    // The same rule the create path follows: a correction never lists a
+    // matter for a day that has gone.
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    if (nextDate !== undefined && nextDate !== null && nextDate >= today) {
+      const matter = await db.case.findUnique({
+        where: { id: existing.caseId },
+        select: { nextHearing: true },
+      });
+      const current = matter?.nextHearing ?? null;
+      // Only when this hearing is the one the case is looking at, or when
+      // the case is looking at nothing.
+      const wasTheOne =
+        current === null ||
+        (existing.nextDate !== null && current.getTime() === existing.nextDate.getTime());
+      if (wasTheOne) {
+        await db.case.update({ where: { id: existing.caseId }, data: { nextHearing: nextDate } });
+      }
+    }
+
+    res.status(204).end();
+  })
+);
+
+officeRouter.delete(
+  "/hearings/:id",
+  requireCap("hearings.edit"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const hearingId = parseId(req.params.id);
+    const removed = await db.hearing.deleteMany({ where: { id: hearingId } });
+    if (removed.count === 0) throw new ApiError(404, "No such hearing.");
+    res.status(204).end();
+  })
+);
+
 officeRouter.post(
   "/hearings/:id/outcome",
   requireCap("hearings.edit"),

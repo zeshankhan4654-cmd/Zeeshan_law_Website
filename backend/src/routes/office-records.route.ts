@@ -312,14 +312,21 @@ officeRecordsRouter.post(
 
     // What the cause list should say next.
     //
-    // A date given from the bench wins, because that is the answer: the
-    // advocate has just been told when to come back. Only when none was
-    // given does the hearing's own date stand in, and then only if it is
-    // still ahead — a hearing written up a week late is history, and
-    // moving the client's next date backwards to it would be a lie.
+    // A date given from the bench wins over the hearing's own, because that
+    // is the answer: the advocate has just been told when to come back.
+    //
+    // But neither moves the cause list backwards into the past. Hearings are
+    // entered late and entered out of order — a file being brought up to
+    // date in the evening, months of history typed in at once — and every
+    // one of those would otherwise leave the matter listed for a day that
+    // has already gone, which is a wrong answer given to a client.
+    //
+    // `setAsNext` off says plainly that this is history, and then nothing
+    // moves at all, whatever dates it carries.
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const moveTo = nextDate || (setAsNext && hearingDate >= today ? hearingDate : null);
+    const proposed = nextDate ?? (hearingDate >= today ? hearingDate : null);
+    const moveTo = setAsNext && proposed && proposed >= today ? proposed : null;
     if (moveTo) {
       await db.case.update({ where: { id: caseId }, data: { nextHearing: moveTo } });
     }
