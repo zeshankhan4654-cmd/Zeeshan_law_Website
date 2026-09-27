@@ -29,6 +29,8 @@ export const CAPS = {
   Diary: {
     "comms.view": "See the communications diary",
     "comms.edit": "Log communications",
+    "tasks.view": "See the chamber's diary of things to be done",
+    "tasks.edit": "Add, tick off and remove diary tasks",
   },
   Library: {
     "library.view": "See the library",

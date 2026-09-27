@@ -202,6 +202,25 @@ export async function platformActor(req: Request): Promise<{ id: number; email: 
 }
 
 /**
+ * Whether this staff member holds a capability, without refusing the request.
+ *
+ * `requireCap` is the gate; this is for a screen that shows more to some
+ * roles than to others. The dashboard is the case in point: everyone with
+ * `cases.view` may open it, but only someone with `tasks.view` should be
+ * handed the diary, and answering 403 for the whole screen because of one
+ * panel would be worse than leaving that panel out.
+ */
+export async function hasCap(req: Request, cap: string): Promise<boolean> {
+  const session = staffSession(req);
+  if (session.role === ROOT_ROLE) return true;
+  const { db, firmId } = tenant(req);
+  const grant = await db.roleCap.findUnique({
+    where: { firmId_roleKey_cap: { firmId, roleKey: session.role, cap } },
+  });
+  return grant !== null;
+}
+
+/**
  * Requires a specific capability. The Principal (ROOT_ROLE) always passes,
  * whatever role_caps contains, so there is no way to lock the one account
  * that grants access out of granting it.

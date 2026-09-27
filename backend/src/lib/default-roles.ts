@@ -43,6 +43,7 @@ export const EDITOR_CAPS = [
   "documents.edit", "messages.reply",
   "money.view", "money.edit",
   "comms.view", "comms.edit",
+  "tasks.view", "tasks.edit",
   "library.view", "library.edit", "library.publish",
   "enquiries.view",
   "blog.edit", "testimonials.edit",
@@ -54,6 +55,7 @@ export const ASSOCIATE_CAPS = [
   "hearings.edit", "updates.edit",
   "documents.edit", "messages.reply",
   "comms.view", "comms.edit",
+  "tasks.view", "tasks.edit",
   "library.view", "library.edit",
   "enquiries.view",
 ];
