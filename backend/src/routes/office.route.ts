@@ -120,7 +120,9 @@ officeRouter.get(
           select: {
             id: true,
             title: true,
+            caseNo: true,
             court: true,
+            stage: true,
             status: true,
             client: { select: { id: true, name: true, phone: true } },
           },
@@ -147,7 +149,9 @@ officeRouter.get(
           recorded: h.outcome !== "",
           caseId: h.case.id,
           caseTitle: h.case.title,
+          caseNo: h.case.caseNo,
           court: h.case.court,
+          stage: h.case.stage,
           status: h.case.status,
           clientName: h.case.client.name,
           clientPhone: h.case.client.phone,
@@ -171,8 +175,12 @@ officeRouter.get(
         ? {
             OR: [
               { title: { contains: q, mode: "insensitive" as const } },
+              // The number is how a court calls a matter and how an
+              // advocate asks for it at the counter.
+              { caseNo: { contains: q, mode: "insensitive" as const } },
               { court: { contains: q, mode: "insensitive" as const } },
               { caseType: { contains: q, mode: "insensitive" as const } },
+              { opposingParty: { contains: q, mode: "insensitive" as const } },
               { client: { name: { contains: q, mode: "insensitive" as const } } },
             ],
           }
@@ -208,12 +216,17 @@ officeRouter.get(
     const found = await db.case.findUnique({
       where: { id: caseId },
       select: {
-        id: true, title: true, court: true, caseType: true, status: true,
-        nextHearing: true, notes: true, createdAt: true,
+        id: true, title: true, caseNo: true, court: true, caseType: true,
+        sections: true, firDetails: true, ourSide: true, opposingParty: true,
+        judge: true, stage: true, status: true,
+        filedOn: true, nextHearing: true, assignedTo: true, notes: true, createdAt: true,
         client: { select: { id: true, name: true, phone: true, email: true, portalEnabled: true } },
         hearings: {
           orderBy: { hearingDate: "desc" },
-          select: { id: true, hearingDate: true, purpose: true, outcome: true },
+          select: {
+            id: true, hearingDate: true, purpose: true, outcome: true,
+            orderSheet: true, attendedBy: true, nextDate: true,
+          },
         },
         updates: {
           orderBy: [{ updateDate: "desc" }, { id: "desc" }],

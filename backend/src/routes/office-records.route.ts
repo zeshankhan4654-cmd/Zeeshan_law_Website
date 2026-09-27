@@ -70,6 +70,10 @@ officeRecordsRouter.get(
       ? {
           OR: [
             { name: { contains: q, mode: "insensitive" as const } },
+            // The father's name and the CNIC, because those are what tell
+            // three clients of the same name apart.
+            { fatherName: { contains: q, mode: "insensitive" as const } },
+            { cnic: { contains: q, mode: "insensitive" as const } },
             { phone: { contains: q, mode: "insensitive" as const } },
             { email: { contains: q, mode: "insensitive" as const } },
           ],
@@ -83,7 +87,7 @@ officeRecordsRouter.get(
         take: limit,
         skip: offset,
         select: {
-          id: true, name: true, phone: true, email: true,
+          id: true, name: true, fatherName: true, cnic: true, phone: true, email: true,
           portalEnabled: true, portalUsername: true,
           _count: { select: { cases: true } },
         },
@@ -95,6 +99,8 @@ officeRecordsRouter.get(
       items: items.map((c) => ({
         id: c.id,
         name: c.name,
+        fatherName: c.fatherName,
+        cnic: c.cnic,
         phone: c.phone,
         email: c.email,
         portalEnabled: c.portalEnabled,
@@ -116,12 +122,16 @@ officeRecordsRouter.get(
     const client = await db.client.findUnique({
       where: { id },
       select: {
-        id: true, name: true, phone: true, email: true, address: true, notes: true,
+        id: true, name: true, fatherName: true, cnic: true,
+        phone: true, email: true, address: true, notes: true,
         portalEnabled: true, portalUsername: true, portalShowFees: true,
         portalMustChangePassword: true, createdAt: true,
         cases: {
           orderBy: [{ nextHearing: "asc" }, { id: "desc" }],
-          select: { id: true, title: true, court: true, status: true, nextHearing: true },
+          select: {
+            id: true, title: true, caseNo: true, court: true,
+            stage: true, status: true, nextHearing: true,
+          },
         },
       },
     });
@@ -232,7 +242,7 @@ officeRecordsRouter.post(
     if (!client) throw new ApiError(400, "That client does not exist.");
 
     const created = await db.case.create({
-      data: { ...data, firmId, nextHearing: data.nextHearing || null },
+      data: { ...data, firmId, nextHearing: data.nextHearing || null, filedOn: data.filedOn || null },
       select: { id: true, title: true },
     });
     res.status(201).json(created);
@@ -252,7 +262,7 @@ officeRecordsRouter.patch(
     const data = req.body as Omit<CaseInput, "clientId">;
     await db.case.update({
       where: { id },
-      data: { ...data, nextHearing: data.nextHearing || null },
+      data: { ...data, nextHearing: data.nextHearing || null, filedOn: data.filedOn || null },
     });
     res.status(204).end();
   })
@@ -269,7 +279,8 @@ officeRecordsRouter.post(
   asyncHandler(async (req, res) => {
     const { db, firmId } = tenant(req);
     const caseId = parseId(req.params.id);
-    const { hearingDate, purpose, setAsNext } = req.body as HearingInput;
+    const { hearingDate, purpose, outcome, orderSheet, attendedBy, nextDate, setAsNext } =
+      req.body as HearingInput;
 
     const matter = await db.case.findUnique({
       where: { id: caseId },
@@ -278,16 +289,39 @@ officeRecordsRouter.post(
     if (!matter) throw new ApiError(404, "No such case.");
 
     const created = await db.hearing.create({
-      data: { firmId, caseId, hearingDate, purpose },
-      select: { id: true, hearingDate: true, purpose: true, outcome: true },
+      data: {
+        firmId,
+        caseId,
+        hearingDate,
+        purpose,
+        outcome,
+        orderSheet,
+        attendedBy,
+        nextDate: nextDate || null,
+      },
+      select: {
+        id: true,
+        hearingDate: true,
+        purpose: true,
+        outcome: true,
+        orderSheet: true,
+        attendedBy: true,
+        nextDate: true,
+      },
     });
 
-    // A hearing recorded for a past date is history; only a future one
-    // should move the date the client and the cause list are told about.
+    // What the cause list should say next.
+    //
+    // A date given from the bench wins, because that is the answer: the
+    // advocate has just been told when to come back. Only when none was
+    // given does the hearing's own date stand in, and then only if it is
+    // still ahead — a hearing written up a week late is history, and
+    // moving the client's next date backwards to it would be a lie.
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    if (setAsNext && hearingDate >= today) {
-      await db.case.update({ where: { id: caseId }, data: { nextHearing: hearingDate } });
+    const moveTo = nextDate || (setAsNext && hearingDate >= today ? hearingDate : null);
+    if (moveTo) {
+      await db.case.update({ where: { id: caseId }, data: { nextHearing: moveTo } });
     }
 
     res.status(201).json(created);
