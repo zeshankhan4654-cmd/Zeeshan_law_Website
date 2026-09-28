@@ -380,6 +380,10 @@ export function demoResponse(path: string, method = "GET"): unknown {
     };
   if (p.startsWith("/api/office/library-folders/")) return { id: 9, name: "New folder", sortOrder: 0 };
   if (p.endsWith("/folder")) return undefined;
+  if (p.startsWith("/api/office/fee-reminders") && method === "POST")
+    return { id: 1, openedAt: day(0) };
+  if (p.startsWith("/api/office/fee-reminders"))
+    return { last: { id: 1, amount: 75000, openedAt: day(-9), openedBy: "admin", caseId: 1 } };
   if (p.endsWith("/documents") && method === "POST") return { id: 9, title: "Added" };
   if (p.startsWith("/api/office/statements/"))
     throw new Error("A statement is drawn from the chamber's own records, which the demonstration has none of.");

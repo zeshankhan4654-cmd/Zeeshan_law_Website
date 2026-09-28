@@ -14,12 +14,14 @@ import {
   communicationListSchema,
   communicationSchema,
   expenseSchema,
+  feeReminderSchema,
   ledgerQuerySchema,
   officialFeeSchema,
   recoveredSchema,
   type CommunicationInput,
   type CommunicationListQuery,
   type ExpenseInput,
+  type FeeReminderInput,
   type LedgerQuery,
   type OfficialFeeInput,
   type RecoveredInput,
@@ -444,5 +446,74 @@ officeDiaryRouter.post(
 
     const token = signStatementGrant({ firm: firmId, scope, id });
     res.json({ path: `/statement/${scope}/${id}?t=${encodeURIComponent(token)}` });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Reminders about money
+// ---------------------------------------------------------------------------
+
+/**
+ * Recording that a reminder was put in front of a client.
+ *
+ * Deliberately narrow about what it claims. The app prepares a message and
+ * hands it to WhatsApp; whether the advocate then pressed send, whether it
+ * arrived, whether it was read — none of that comes back. So this records
+ * that a reminder was opened, by whom, on what day, for what figure, and
+ * nothing more. A record claiming a message was sent would be one the
+ * chamber could not rely on in the conversation where it matters.
+ */
+officeDiaryRouter.post(
+  "/fee-reminders",
+  requireCap("money.edit"),
+  validate(feeReminderSchema),
+  asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
+    const { clientId, caseId, amount, channel } = req.body as FeeReminderInput;
+
+    const client = await db.client.findUnique({ where: { id: clientId }, select: { id: true } });
+    if (!client) throw new ApiError(404, "That client is not in this chamber's records.");
+    if (caseId !== null) {
+      const matter = await db.case.findUnique({ where: { id: caseId }, select: { id: true } });
+      if (!matter) throw new ApiError(404, "That matter is not in this chamber's records.");
+    }
+
+    const created = await db.feeReminder.create({
+      data: {
+        firmId,
+        clientId,
+        caseId,
+        amount,
+        channel,
+        openedBy: staffSession(req).username,
+      },
+      select: { id: true, openedAt: true },
+    });
+    res.status(201).json(created);
+  })
+);
+
+/**
+ * When this client was last reminded, and about how much.
+ *
+ * One row is all a screen needs. The question being answered is "have we
+ * asked recently", and a chamber asking twice in a day reads as harassment
+ * while one that has not asked in six months is letting a fee go quietly
+ * uncollectable.
+ */
+officeDiaryRouter.get(
+  "/fee-reminders/:clientId",
+  requireCap("money.view"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const clientId = parseId(req.params.clientId);
+
+    const last = await db.feeReminder.findFirst({
+      where: { clientId },
+      orderBy: { openedAt: "desc" },
+      select: { id: true, amount: true, openedAt: true, openedBy: true, caseId: true },
+    });
+
+    res.json({ last: last ? { ...last, amount: Number(last.amount) } : null });
   })
 );

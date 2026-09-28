@@ -25,6 +25,43 @@ datasource db {
 /// Every other table below belongs to exactly one of these, and nothing in
 /// one firm is reachable from another. The platform's own chamber is simply
 /// the first row.
+/// A reminder about money, and when it was put in front of a client.
+///
+/// A chamber needs to know when it last asked, for two reasons that pull in
+/// the same direction: asking twice in a day reads as harassment, and not
+/// asking for six months is how a fee quietly becomes uncollectable.
+///
+/// What is recorded is deliberately narrow. The app prepares a message and
+/// hands it to WhatsApp; whether the advocate then pressed send, whether it
+/// was delivered, whether it was read — none of that comes back, and a
+/// record claiming otherwise would be a record a chamber could not rely on.
+/// So this says only that a reminder was prepared and opened, on a date, by
+/// a named person, for an amount that was outstanding at that moment.
+model FeeReminder {
+  id       Int      @id @default(autoincrement())
+  clientId Int      @map("client_id")
+  /// The matter it concerned, where it concerned one rather than the
+  /// client's whole account.
+  caseId   Int?     @map("case_id")
+  /// What was outstanding when it was opened, kept because the figure
+  /// moves and "we reminded them" means nothing without it.
+  amount   Decimal  @db.Decimal(12, 2)
+  /// How it was put in front of them. "whatsapp" today.
+  channel  String   @default("whatsapp")
+  openedBy String   @default("") @map("opened_by")
+  openedAt DateTime @default(now()) @map("opened_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  case   Case?  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@index([firmId, clientId])
+  @@index([firmId, caseId])
+  @@map("fee_reminders")
+}
+
 model Firm {
   id              Int    @id @default(autoincrement())
   /// Used in URLs and invitations, e.g. "arbitrator-law".
@@ -73,6 +110,7 @@ model Firm {
   pushTokens     PushToken[]
   diaryTasks     DiaryTask[]
   libraryFolders LibraryFolder[]
+  feeReminders   FeeReminder[]
 
   @@map("firms")
 }
@@ -272,6 +310,7 @@ model Client {
   cases          Case[]
   communications Communication[]
   tasks          DiaryTask[]
+  feeReminders   FeeReminder[]
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
@@ -332,8 +371,9 @@ model Case {
   expenses       Expense[]
   communications Communication[]
 
-  firmId Int  @map("firm_id")
-  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  firmId      Int           @map("firm_id")
+  firm        Firm          @relation(fields: [firmId], references: [id], onDelete: Cascade)
+  FeeReminder FeeReminder[]
 
   @@index([firmId])
   @@index([clientId])

@@ -214,3 +214,45 @@ export function whatsappUrl(phone: string, message: string): string | null {
       : digits;
   return `https://wa.me/${international}?text=${encodeURIComponent(message)}`;
 }
+
+/** When this client was last reminded, and about how much. */
+export type FeeReminder = {
+  id: number;
+  amount: number;
+  openedAt: string;
+  openedBy: string;
+  caseId: number | null;
+};
+
+export function useLastReminder(clientId: number | null) {
+  const token = useAuthToken();
+  return useQuery({
+    queryKey: ["office", "fee-reminder", clientId],
+    queryFn: () =>
+      apiFetch<{ last: FeeReminder | null }>(`/api/office/fee-reminders/${clientId}`, { token }),
+    enabled: token !== null && clientId !== null,
+  });
+}
+
+/**
+ * Recording that a reminder was put in front of a client.
+ *
+ * Written after WhatsApp has been opened, not before, and it claims only
+ * that: what comes back from WhatsApp is nothing at all, so a record saying
+ * the message was sent would be one the chamber could not stand behind.
+ */
+export function useRecordReminder() {
+  const token = useAuthToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { clientId: number; caseId: number | null; amount: number }) =>
+      apiFetch<{ id: number; openedAt: string }>("/api/office/fee-reminders", {
+        method: "POST",
+        token,
+        body: JSON.stringify({ ...body, channel: "whatsapp" }),
+      }),
+    onSuccess: (_d, vars) => {
+      void queryClient.invalidateQueries({ queryKey: ["office", "fee-reminder", vars.clientId] });
+    },
+  });
+}

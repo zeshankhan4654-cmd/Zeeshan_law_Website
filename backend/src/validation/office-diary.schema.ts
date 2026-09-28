@@ -122,3 +122,22 @@ export const ledgerQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(500).default(200),
 });
 export type LedgerQuery = { from: Date | null; to: Date | null; limit: number };
+
+/**
+ * A reminder put in front of a client.
+ *
+ * `amount` is what was outstanding at that moment, kept because the figure
+ * moves and "we reminded them" means nothing without it.
+ */
+export const feeReminderSchema = Joi.object({
+  clientId: Joi.number().integer().min(1).required(),
+  caseId: Joi.number().integer().min(1).allow(null).default(null),
+  amount: Joi.number().min(0).max(999_999_999).required(),
+  channel: Joi.string().valid("whatsapp").default("whatsapp"),
+});
+export type FeeReminderInput = {
+  clientId: number;
+  caseId: number | null;
+  amount: number;
+  channel: string;
+};

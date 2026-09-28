@@ -31,7 +31,13 @@ import {
 } from "@/lib/office";
 import { AddDocument } from "@/components/AddDocument";
 import { HearingEdit } from "@/components/HearingEdit";
-import { statementUrl, useStatementLink, whatsappUrl } from "@/lib/money";
+import {
+  statementUrl,
+  useLastReminder,
+  useRecordReminder,
+  useStatementLink,
+  whatsappUrl,
+} from "@/lib/money";
 import { formatDate, formatRupees } from "@/lib/portal";
 import { can, useSession } from "@/lib/session";
 
@@ -110,6 +116,16 @@ export default function OfficeCaseFile() {
   const [statementProblem, setStatementProblem] = useState<string | null>(null);
   const statement = useStatementLink();
   const editHearing = useEditHearing(caseId);
+  const recordReminder = useRecordReminder();
+  /**
+   * Called here with the rest, never after the guards below.
+   *
+   * A hook placed after an early return is called on some renders and not
+   * others, and React refuses the second render outright — the whole case
+   * file went blank rather than merely losing this line. Null while the
+   * matter is still loading; the hook stands down on it.
+   */
+  const { data: lastReminder } = useLastReminder(data?.client.id ?? null);
   const deleteHearing = useDeleteHearing(caseId);
 
   if (isPending) {
@@ -147,6 +163,7 @@ export default function OfficeCaseFile() {
    * is how a chamber loses a client it still had.
    */
   const outstanding = data.fees.shown ? data.fees.agreed - data.fees.received : 0;
+  const clientId = data.client.id;
   const reminder =
     data.fees.shown && outstanding > 0 && data.client.phone
       ? whatsappUrl(
@@ -157,6 +174,26 @@ export default function OfficeCaseFile() {
             `Please telephone the office if this does not agree with yours.`
         )
       : null;
+
+  /**
+   * Opened first, recorded after. If WhatsApp cannot be opened at all there
+   * is nothing to record, and a chamber's own note saying it reminded
+   * somebody when it did not is worse than no note.
+   */
+  async function remind() {
+    if (!reminder) return;
+    await Linking.openURL(reminder);
+    try {
+      await recordReminder.mutateAsync({
+        clientId,
+        caseId,
+        amount: outstanding,
+      });
+    } catch {
+      // The reminder is already in front of the client; failing to note it
+      // is not worth an error on top of that.
+    }
+  }
 
   async function openStatement() {
     setStatementProblem(null);
@@ -470,13 +507,24 @@ export default function OfficeCaseFile() {
 
               {reminder ? (
                 <Pressable
-                  onPress={() => void Linking.openURL(reminder)}
+                  onPress={() => void remind()}
                   className="flex-1 items-center rounded-card border border-rule py-2.5 active:bg-gold-wash"
                 >
                   <Text className="text-sm font-semibold text-ink">Remind on WhatsApp</Text>
                 </Pressable>
               ) : null}
             </View>
+
+            {/* What the chamber can actually say about the last reminder,
+                and no more: it was opened. Whether it was then sent, or
+                arrived, or was read, never comes back from WhatsApp. */}
+            {lastReminder?.last ? (
+              <Text className="text-xs leading-5 text-ink-soft">
+                Last reminder opened {formatDate(lastReminder.last.openedAt)} for{" "}
+                {formatRupees(lastReminder.last.amount)}
+                {lastReminder.last.openedBy ? `, by ${lastReminder.last.openedBy}` : ""}.
+              </Text>
+            ) : null}
 
             {statementProblem ? (
               <Text className="text-xs text-danger">{statementProblem}</Text>
