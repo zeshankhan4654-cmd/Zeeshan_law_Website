@@ -25,3 +25,29 @@ to be abandoned and started again under a new package name, and every
 existing installation would be orphaned.
 
 Somewhere you will still have in five years. Not only this laptop.
+
+---
+
+# `Lawyer360-sample-for-your-phone.apk` — to try on a handset
+
+Download it **on the phone**, tap it, and allow the install when Android
+asks. Android warns about files from outside the Play Store; that warning
+is about where the file came from, not about this file.
+
+    name on the phone   Lawyer360 (sample)
+    package             com.lawyer360.app.demo
+    built for           arm64 phones (every handset of the last decade)
+    talks to            nothing — the sample data is inside it
+
+A separate package from the store app on purpose, so this and the real
+Lawyer360 can sit on the phone at once. Android refuses to install one
+over the other when the signing keys differ, and says only "App not
+installed", which explains nothing.
+
+Everything in it is invented: no real client, no real matter, no real fee.
+Nothing is saved — close it and open it again and it is as it was. Unlike
+the browser demonstration, the camera and the file picker work.
+
+Permissions it asks for, and nothing besides: internet, camera, microphone
+and audio settings (for a client's spoken note), reading a file to attach,
+vibration, and restarting reminders after the phone reboots.
