@@ -1,3 +1,18 @@
+/**
+ * The website is built with Webpack, not Turbopack — see the `--webpack`
+ * flag on the build script in package.json.
+ *
+ * Next 16 builds with Turbopack by default, and Turbopack needs the native
+ * SWC binding. The shared host this site is deployed to has an older glibc
+ * than that binding requires (it asks for GLIBC_2.29 and does not find it),
+ * so Next falls back to the WebAssembly build — which Turbopack refuses to
+ * run on, stopping the deployment outright.
+ *
+ * Webpack is slower and produces the same site. Do not remove the flag
+ * without checking that the deployment host can load the native binding;
+ * it builds fine on a developer machine either way, and the failure only
+ * appears on the server.
+ */
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
