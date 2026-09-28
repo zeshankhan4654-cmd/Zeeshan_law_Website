@@ -22,7 +22,25 @@
  * which does need it.
  */
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
-const needsCleartext = apiUrl === "" || apiUrl.startsWith("http://");
+
+/**
+ * A build that answers from data inside itself, with no server behind it.
+ *
+ * It exists so the app can be installed and used — camera, file picker and
+ * all — before the API is deployed, and so it can be handed to somebody
+ * without giving them an account.
+ */
+const isDemo = process.env.EXPO_PUBLIC_DEMO === "1";
+
+/**
+ * A demonstration build makes no request of any kind, so it needs no
+ * exception for plain HTTP. Without the first clause it got one: the rule
+ * below reads an unset API address as "a developer on the office wifi",
+ * which is right for a development build and wrong for this one. An APK
+ * that permits cleartext for a network it never touches is a weakening
+ * with nothing on the other side of it.
+ */
+const needsCleartext = !isDemo && (apiUrl === "" || apiUrl.startsWith("http://"));
 
 /**
  * The domain the advocates' client links live on.
@@ -48,7 +66,14 @@ module.exports = {
    * Every screen reads this through `Constants.expoConfig.name` rather
    * than writing it out, so it is changed here and nowhere else.
    */
-  name: "Lawyer360",
+  //
+  // A demonstration build is a separate application on the handset, under
+  // its own name and its own package. Sharing them would mean the sample
+  // app and the real one could not both be installed: Android refuses to
+  // put one over the other when the signing keys differ, which they do —
+  // one is signed by the build service, the other by Play — and the error
+  // it gives ("App not installed") says nothing about why.
+  name: isDemo ? "Lawyer360 (sample)" : "Lawyer360",
   slug: "lawyer360",
   scheme: "lawyer360",
   /**
@@ -78,7 +103,7 @@ module.exports = {
   android: {
     // As with iOS: fixed for the life of the listing, and it is visible in
     // the Play Store address.
-    package: "com.lawyer360.app",
+    package: isDemo ? "com.lawyer360.app.demo" : "com.lawyer360.app",
     /**
      * Draw behind the status and navigation bars.
      *

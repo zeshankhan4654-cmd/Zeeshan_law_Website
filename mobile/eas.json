@@ -6,6 +6,15 @@
   "build": {
     "//": "Three ways to build. Pick one with --profile <name>.",
 
+    "demo": {
+      "//": "The app with its own sample data inside it. It needs no server at all, so it can be installed and used before the API is deployed - and unlike the browser link, the camera and the file picker work. Everything it shows is invented; nothing is saved.",
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_DEMO": "1"
+      }
+    },
+
     "apk": {
       "//": "An installable Android file, pointing at the live server. This is the one to build once the API is deployed: it works anywhere, on mobile data, like any normal app.",
       "distribution": "internal",
