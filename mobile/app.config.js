@@ -131,10 +131,6 @@ module.exports = {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#17140F",
     },
-    // See needsCleartext above: true only when this build's own API address
-    // is plain http, so a build aimed at the live server cannot ship with
-    // the exception however the profile is named.
-    usesCleartextTraffic: needsCleartext,
     intentFilters: [
       {
         action: "VIEW",
@@ -182,6 +178,24 @@ module.exports = {
         android: {
           compileSdkVersion: 36,
           targetSdkVersion: 36,
+          /**
+           * See needsCleartext above: true only when this build's own API
+           * address is plain http, so a build aimed at the live server
+           * cannot ship with the exception however the profile is named.
+           *
+           * It belongs here rather than under `android` in this config,
+           * where it sat until the generated manifest was read back. Expo
+           * has no `android.usesCleartextTraffic` key: it was accepted in
+           * silence and dropped, and the manifest came out the same either
+           * way. The Play build was unharmed — cleartext is off by default
+           * at this API level, which is what that build wants — but the
+           * apk-local profile, whose whole purpose is to reach a laptop
+           * over http on the office wifi, would have failed every request
+           * with no useful error. A setting that is quietly ignored is
+           * worse than one that is absent, because the comment beside it
+           * says it is working.
+           */
+          usesCleartextTraffic: needsCleartext,
         },
       },
     ],

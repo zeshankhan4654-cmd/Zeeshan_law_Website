@@ -4,3 +4,10 @@
 
 expo-env.d.ts
 # @end expo-cli
+
+# The native projects, when `expo prebuild` is run to inspect what a build
+# will actually produce. They are generated from app.config.js and are not
+# the source of anything: committed, they go stale the moment the config
+# changes, and the stale copy is what gets built. EAS regenerates them.
+android/
+ios/
