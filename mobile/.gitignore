@@ -11,3 +11,6 @@ expo-env.d.ts
 # changes, and the stale copy is what gets built. EAS regenerates them.
 android/
 ios/
+
+# Whoever is building supplies this; it is not the repository's.
+eas-project-id.txt

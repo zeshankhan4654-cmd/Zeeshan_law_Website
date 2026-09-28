@@ -58,6 +58,32 @@ const needsCleartext = !isDemo && (apiUrl === "" || apiUrl.startsWith("http://")
  */
 const SITE_HOST = process.env.EXPO_PUBLIC_SITE_HOST || "arbitratorandlaw.com";
 
+/**
+ * The EAS project id, which `eas init` prints and cannot write down itself.
+ *
+ * It writes the id into app.json, and this project's config is JavaScript,
+ * so there is nothing for it to write into: it prints the id and leaves it
+ * to a person to place. That is a step easily missed, and the build fails
+ * afterwards with a message about a project that cannot be found, which
+ * does not say what to do.
+ *
+ * So it can be put in a plain file next to this one — one line, the id and
+ * nothing else — and is read from there when the environment does not
+ * supply it. The file is ignored by git: an id belongs to whoever is
+ * building, not to the repository.
+ */
+function easProjectId() {
+  if (process.env.EAS_PROJECT_ID) return process.env.EAS_PROJECT_ID;
+  try {
+    const id = require("node:fs")
+      .readFileSync(require("node:path").join(__dirname, "eas-project-id.txt"), "utf8")
+      .trim();
+    return id || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
   /**
@@ -279,7 +305,7 @@ module.exports = {
        * src/lib/push-registration.ts, which falls back to the id baked
        * into an EAS build when this is empty.
        */
-      projectId: process.env.EAS_PROJECT_ID,
+      projectId: easProjectId(),
     },
   },
 };
