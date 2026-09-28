@@ -79,7 +79,50 @@ const HEARINGS = [
     status: "Active", clientName: "Sher Afzal Khan", clientPhone: "" },
 ];
 
-const DEMO_TASKS = [
+const DEMO_HEARING_DATES = [
+  { date: day(0), at: 0 },
+  { date: day(1), at: 1 },
+  { date: day(4), at: 2 },
+];
+
+const FOLLOW_UPS = [
+  {
+    id: 1,
+    followUpDue: day(0),
+    subject: "Ring before the date",
+    summary: "Ask him to bring the original sale agreement to court.",
+    personName: "Fazal ur Rehman",
+    client: { id: 1, name: "Fazal ur Rehman" },
+  },
+];
+
+/**
+ * The diary is the one part of the demonstration that is *kept*.
+ *
+ * Every other write here answers "done" and changes nothing, because every
+ * other form leaves the screen straight afterwards and there is nothing left
+ * on it to contradict. The diary is different: the list of things to be done
+ * sits on the same screen as the box you type into. A task that answered
+ * "saved" and then did not appear would not read as a demonstration — it
+ * would read as an app that loses your work.
+ *
+ * So these live in memory for as long as the page is open, and reload puts
+ * them back as they were. Nothing leaves the phone either way.
+ */
+type DemoTask = {
+  id: number;
+  taskDate: string;
+  title: string;
+  notes: string;
+  priority: string;
+  done: boolean;
+  doneAt: string | null;
+  createdBy: string;
+  case: { id: number; title: string; caseNo: string } | null;
+  client: { id: number; name: string } | null;
+};
+
+const DEMO_TASKS: DemoTask[] = [
   {
     id: 1,
     taskDate: day(-3),
@@ -182,7 +225,31 @@ const DEMO_CLIENTS = [
     phone: "0345 2223334", email: "sher@example.com", portalEnabled: true, portalUsername: "sher.afzal", caseCount: 1 },
 ];
 
-export function demoResponse(path: string, method = "GET"): unknown {
+/** The id in a path like /api/office/tasks/12/done. */
+function idIn(p: string): number {
+  return Number(p.split("/").filter((seg) => /^\d+$/.test(seg)).pop());
+}
+
+/** What the screen sent, as an object. Anything unreadable is simply empty. */
+function read(body?: BodyInit | null): Record<string, unknown> {
+  if (typeof body !== "string") return {};
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The query string of a path, whatever the platform's URL support. */
+function query(path: string): URLSearchParams {
+  return new URLSearchParams(path.split("?")[1] ?? "");
+}
+
+/** Ids for tasks added during the demonstration, above every bundled one. */
+let nextTaskId = 1000;
+
+export function demoResponse(path: string, method = "GET", body?: BodyInit | null): unknown {
   const p = path.split("?")[0] ?? path;
 
   // The demonstration is a shop window, so it shows registration open.
@@ -425,29 +492,100 @@ export function demoResponse(path: string, method = "GET"): unknown {
   // happens to want. Demonstration data that agrees with the app rather than
   // with the server hides the bug it is meant to expose — which is exactly
   // how the site settings screen stayed broken.
-  if (p.startsWith("/api/office/dashboard"))
-    return {
-      from: day(0).slice(0, 10),
-      to: day(0).slice(0, 10),
-      counts: { hearings: 1, tasks: 2, overdue: 1, activeCases: 3 },
-      hearings: [{ ...HEARINGS[0], date: day(0).slice(0, 10), caseNo: "Cr.A. 412/2026", stage: "Arguments" }],
-      tasks: DEMO_TASKS.filter((t) => !t.done).slice(0, 1),
-      followUps: [
-        {
-          id: 1,
-          followUpDue: day(0),
-          subject: "Ring before the date",
-          summary: "Ask him to bring the original sale agreement to court.",
-          personName: "Fazal ur Rehman",
-          client: { id: 1, name: "Fazal ur Rehman" },
-        },
-      ],
-    };
+  // Worked out from the same data the diary answers from, rather than
+  // written down. Counts that were written down would go on saying two
+  // after a task was ticked off, and the period tabs would all read alike.
+  if (p.startsWith("/api/office/dashboard")) {
+    const q = query(path);
+    const from = q.get("from") ?? day(0);
+    const to = q.get("to") ?? from;
+    const within = (d: string) => d >= from && d <= to;
 
-  if (p.startsWith("/api/office/tasks") && method === "POST") return { id: 99 };
-  if (p.startsWith("/api/office/tasks/")) return undefined;
-  if (p.startsWith("/api/office/tasks"))
-    return { items: DEMO_TASKS, overdue: DEMO_TASKS.filter((t) => !t.done && t.taskDate < day(0)).length };
+    const hearings = DEMO_HEARING_DATES.filter(({ date }) => within(date)).map(({ date, at }) => ({
+      ...HEARINGS[at],
+      date,
+      caseNo: at === 0 ? "Cr.A. 412/2026" : "",
+      stage: at === 0 ? "Arguments" : "",
+    }));
+    const tasks = DEMO_TASKS.filter((t) => !t.done && within(t.taskDate));
+    const followUps = FOLLOW_UPS.filter((f) => within(f.followUpDue));
+
+    return {
+      from,
+      to,
+      counts: {
+        hearings: hearings.length,
+        // The office counts a call to be returned alongside a task, so the
+        // two are added together here exactly as the server adds them.
+        tasks: tasks.length + followUps.length,
+        overdue: DEMO_TASKS.filter((t) => !t.done && t.taskDate < day(0)).length,
+        activeCases: 3,
+      },
+      hearings,
+      tasks,
+      followUps,
+    };
+  }
+
+  // Ticking one off, and putting it back. Both directions, because a task
+  // ticked by mistake has to be able to come back.
+  if (method === "POST" && /\/api\/office\/tasks\/\d+\/done/.test(p)) {
+    const task = DEMO_TASKS.find((t) => t.id === idIn(p));
+    if (task) {
+      const done = (read(body) as { done?: boolean }).done !== false;
+      task.done = done;
+      task.doneAt = done ? day(0) : null;
+    }
+    return { ok: true };
+  }
+
+  if (method === "DELETE" && /\/api\/office\/tasks\/\d+$/.test(p)) {
+    const at = DEMO_TASKS.findIndex((t) => t.id === idIn(p));
+    if (at >= 0) DEMO_TASKS.splice(at, 1);
+    return { ok: true };
+  }
+
+  if (p.startsWith("/api/office/tasks") && method === "POST") {
+    const sent = read(body) as Partial<DemoTask> & { caseId?: number | null; clientId?: number | null };
+    const added: DemoTask = {
+      id: nextTaskId++,
+      taskDate: sent.taskDate || day(0),
+      title: sent.title ?? "",
+      notes: sent.notes ?? "",
+      priority: sent.priority || "Normal",
+      done: false,
+      doneAt: null,
+      createdBy: "admin",
+      // Only what the demonstration can honestly resolve: the one matter it
+      // holds. Anything else is left unattached rather than invented.
+      case:
+        sent.caseId === CASE_DETAIL.id
+          ? { id: CASE_DETAIL.id, title: CASE_DETAIL.title, caseNo: CASE_DETAIL.caseNo ?? "" }
+          : null,
+      client: null,
+    };
+    DEMO_TASKS.push(added);
+    return { id: added.id };
+  }
+
+  if (p.startsWith("/api/office/tasks")) {
+    const q = query(path);
+    const state = q.get("state") ?? "open";
+    const from = q.get("from");
+    const to = q.get("to");
+    const items = DEMO_TASKS.filter(
+      (t) =>
+        (state === "all" || t.done === (state === "done")) &&
+        (!from || t.taskDate >= from) &&
+        (!to || t.taskDate <= to)
+    ).sort((a, b) =>
+      Number(a.done) - Number(b.done) || a.taskDate.localeCompare(b.taskDate) || a.id - b.id
+    );
+    // Counted whatever period is open: something a fortnight late does not
+    // stop being late because the diary is open on Friday. Same rule the
+    // server applies.
+    return { items, overdue: DEMO_TASKS.filter((t) => !t.done && t.taskDate < day(0)).length };
+  }
 
   if (p === "/api/office/diary")
     return { days: [

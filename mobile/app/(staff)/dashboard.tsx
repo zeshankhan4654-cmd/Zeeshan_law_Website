@@ -53,11 +53,15 @@ function Count({
   label,
   tone,
   icon: Icon,
+  onPress,
 }: {
   value: number;
   label: string;
   tone: "plain" | "gold" | "danger" | "success";
   icon: typeof CalendarDays;
+  /** Given where the number can be acted on. A count you cannot open is a
+   *  number that tells you something is wrong and then leaves you there. */
+  onPress?: () => void;
 }) {
   const border = {
     plain: "border-l-ink-soft",
@@ -67,14 +71,21 @@ function Count({
   }[tone];
   const colour = { plain: "#4b443a", gold: "#9a7622", danger: "#8e2f1f", success: "#2e6042" }[tone];
 
+  const Box = onPress ? Pressable : View;
+
   return (
-    <View className={`min-w-[46%] flex-1 gap-1 rounded-card border border-rule border-l-4 bg-surface p-3.5 ${border}`}>
+    <Box
+      {...(onPress ? { onPress, testID: `count-${label.toLowerCase().replace(/ /g, "-")}` } : {})}
+      className={`min-w-[46%] flex-1 gap-1 rounded-card border border-rule border-l-4 bg-surface p-3.5 ${border} ${
+        onPress ? "active:bg-gold-wash" : ""
+      }`}
+    >
       <View className="flex-row items-start justify-between">
         <Text className="text-2xl font-semibold text-ink">{value}</Text>
         <Icon size={17} color={colour} />
       </View>
       <Text className="text-[11px] uppercase leading-4 tracking-wider text-ink-soft">{label}</Text>
-    </View>
+    </Box>
   );
 }
 
@@ -330,8 +341,20 @@ export default function Dashboard() {
 
       <View className="flex-row flex-wrap gap-3">
         <Count value={data.counts.hearings} label="Hearings" tone="success" icon={CalendarDays} />
-        <Count value={data.counts.tasks} label="To be done" tone="gold" icon={Circle} />
-        <Count value={data.counts.overdue} label="Overdue" tone="danger" icon={AlertTriangle} />
+        <Count
+          value={data.counts.tasks}
+          label="To be done"
+          tone="gold"
+          icon={Circle}
+          onPress={() => router.push("/tasks")}
+        />
+        <Count
+          value={data.counts.overdue}
+          label="Overdue"
+          tone="danger"
+          icon={AlertTriangle}
+          onPress={() => router.push("/tasks?state=overdue")}
+        />
         <Count value={data.counts.activeCases} label="Active cases" tone="plain" icon={Briefcase} />
       </View>
 

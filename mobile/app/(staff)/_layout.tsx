@@ -37,6 +37,7 @@ export default function StaffLayout() {
       <Stack.Screen name="files/[id]/fee" options={{ title: "Record a fee" }} />
       <Stack.Screen name="chamber/staff" options={{ title: "Your colleagues" }} />
       <Stack.Screen name="chamber/settings" options={{ title: "What the site says" }} />
+      <Stack.Screen name="tasks" options={{ title: "The diary" }} />
       <Stack.Screen name="chamber-library/index" options={{ title: "Your library" }} />
       <Stack.Screen name="chamber-library/judgments" options={{ title: "Judgment" }} />
       <Stack.Screen name="chamber-library/research" options={{ title: "Writing" }} />
