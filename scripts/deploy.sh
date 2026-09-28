@@ -99,7 +99,32 @@ say "Installing"
 # somehow got past that, would fail silently at 4:30pm every day.
 #
 # The cost is disk. None of it is reachable from the running server.
-npm ci
+#
+# --include=dev is not belt and braces, it is the whole point. This script
+# reads backend/.env a few lines above to check the settings before touching
+# anything, and that read exports NODE_ENV=production into this shell. npm
+# takes NODE_ENV=production to mean `omit=dev`, so the plain `npm ci` that
+# stood here dropped every devDependency — typescript among them — and the
+# build directly below died with "tsc: command not found". The paragraph
+# above argues at length against omitting these, and the script then did it
+# to itself. Stated explicitly, the flag outranks the environment.
+npm ci --include=dev
+
+# Before either build, because both compile against it.
+#
+# `npm ci` wipes node_modules and puts back whatever the lockfile names.
+# The generated Prisma client is not in the lockfile — it is written into
+# node_modules by a generate step — so a fresh install leaves the compiler
+# with no types for the database. The build then fails with a page of
+# "implicitly has an 'any' type" and "Property 'dmmf' does not exist",
+# which reads like broken source code and is nothing of the kind.
+#
+# It used to run after both builds, beside `migrate deploy`. That worked
+# only because node_modules already held a client from an earlier
+# deployment; the first deployment onto a clean checkout could not have
+# succeeded.
+say "Generating the database client"
+( cd backend && npx prisma generate )
 
 say "Building the API"
 npm run build:backend
@@ -116,7 +141,9 @@ npm run build:frontend
 # ---------------------------------------------------------------------------
 say "Applying migrations"
 # deploy, never `migrate dev`: dev can prompt, and can reset.
-( cd backend && npx prisma migrate deploy && npx prisma generate )
+# generate already ran above, before the builds that needed it. Migrations
+# do not change schema.prisma, so there is nothing here to regenerate from.
+( cd backend && npx prisma migrate deploy )
 
 say "Seeding, if this is a new database"
 # Idempotent: it skips the account and the articles if either already exists.
