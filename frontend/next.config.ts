@@ -18,6 +18,25 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  /**
+   * Build the pages in this process, rather than farming them out.
+   *
+   * Next generates static pages across a pool of child processes, one per
+   * CPU. Shared hosting caps how many processes an account may run at once,
+   * and the cap is well below the core count the machine reports — so the
+   * build compiled successfully, finished type-checking, and then died on
+   * `spawn ... EAGAIN`, which is the kernel refusing a new process, not an
+   * error in the site.
+   *
+   * One worker and no worker threads keeps the whole build inside the
+   * process already running. It is slower, and it is the difference between
+   * a site that deploys and one that does not.
+   */
+  experimental: {
+    cpus: 1,
+    workerThreads: false,
+  },
+
   async headers() {
     return [
       {
