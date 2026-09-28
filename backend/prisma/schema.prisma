@@ -72,6 +72,7 @@ model Firm {
   posts          Post[]
   pushTokens     PushToken[]
   diaryTasks     DiaryTask[]
+  libraryFolders LibraryFolder[]
 
   @@map("firms")
 }
@@ -604,6 +605,38 @@ model Communication {
 // Library — public once published
 // ---------------------------------------------------------------------------
 
+/// A shelf in a chamber's own library.
+///
+/// The library fills up faster than anything else in an office — every
+/// judgment worth keeping, every note written while researching a point —
+/// and a flat list of four hundred entries is one nobody looks in. A
+/// chamber shelves them its own way: by court, by subject, by the matter
+/// they were written for.
+///
+/// Folders are per kind. Judgments and written notes are not filed
+/// together on a real shelf and there is no reason to force it here.
+model LibraryFolder {
+  id        Int      @id @default(autoincrement())
+  /// "judgments" | "research" | "media"
+  kind      String
+  name      String
+  /// The chamber's own order, so a shelf can be arranged rather than
+  /// alphabetised for it.
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  judgments Judgment[]
+  research  Research[]
+  media     Media[]
+
+  firmId Int  @map("firm_id")
+  firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
+
+  @@unique([firmId, kind, name])
+  @@index([firmId, kind])
+  @@map("library_folders")
+}
+
 model Judgment {
   id           Int       @id @default(autoincrement())
   title        String
@@ -641,6 +674,12 @@ model Judgment {
 
   /// The chamber that wrote it. Sharing it with every other chamber is the
   /// separate, moderated act above.
+  /// The shelf it is on, if any. Removing a shelf leaves what was on
+  /// it in the library rather than destroying it — a folder is how a
+  /// chamber arranges its work, not what the work belongs to.
+  folderId Int?           @map("folder_id")
+  folder   LibraryFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
@@ -682,6 +721,12 @@ model Research {
 
   case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
 
+  /// The shelf it is on, if any. Removing a shelf leaves what was on
+  /// it in the library rather than destroying it — a folder is how a
+  /// chamber arranges its work, not what the work belongs to.
+  folderId Int?           @map("folder_id")
+  folder   LibraryFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)
 
@@ -721,6 +766,12 @@ model Media {
   shareNote   String    @default("") @map("share_note")
   /// The handle of whoever submitted it, for the chamber's own record.
   submittedBy String    @default("") @map("submitted_by")
+
+  /// The shelf it is on, if any. Removing a shelf leaves what was on
+  /// it in the library rather than destroying it — a folder is how a
+  /// chamber arranges its work, not what the work belongs to.
+  folderId Int?           @map("folder_id")
+  folder   LibraryFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   firmId Int  @map("firm_id")
   firm   Firm @relation(fields: [firmId], references: [id], onDelete: Cascade)

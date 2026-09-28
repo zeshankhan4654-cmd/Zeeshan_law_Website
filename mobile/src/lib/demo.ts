@@ -368,6 +368,18 @@ export function demoResponse(path: string, method = "GET"): unknown {
   // nowhere is worse than none: the button says so instead of opening a
   // broken page.
   if (p.startsWith("/api/office/hearings/")) return undefined;
+  // Shelves, so the demonstration shows the library arranged rather than
+  // as one long list.
+  if (p.startsWith("/api/office/library-folders/") && method === "GET")
+    return {
+      items: [
+        { id: 1, name: "Limitation", sortOrder: 1, count: 2 },
+        { id: 2, name: "Family law", sortOrder: 2, count: 1 },
+      ],
+      unfiled: 4,
+    };
+  if (p.startsWith("/api/office/library-folders/")) return { id: 9, name: "New folder", sortOrder: 0 };
+  if (p.endsWith("/folder")) return undefined;
   if (p.endsWith("/documents") && method === "POST") return { id: 9, title: "Added" };
   if (p.startsWith("/api/office/statements/"))
     throw new Error("A statement is drawn from the chamber's own records, which the demonstration has none of.");

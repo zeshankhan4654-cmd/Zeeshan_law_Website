@@ -18,11 +18,17 @@ import { ApiError } from "../middleware/errorHandler.js";
 import { validate, validateQuery } from "../middleware/validate.js";
 import {
   judgmentSchema,
+  libraryFileSchema,
+  libraryFolderEditSchema,
+  libraryFolderSchema,
   libraryListSchema,
   mediaSchema,
   researchSchema,
   type JudgmentInput,
   type LibraryAdminQuery,
+  type LibraryFileInput,
+  type LibraryFolderEdit,
+  type LibraryFolderInput,
   type MediaInput,
   type ResearchInput,
 } from "../validation/office-library.schema.js";
@@ -53,6 +59,18 @@ function parseId(raw: string | undefined): number {
   const id = Number(raw);
   if (!Number.isInteger(id) || id < 1) throw new ApiError(400, "Not a valid id.");
   return id;
+}
+
+/**
+ * Narrowing a list to one shelf.
+ *
+ * "none" is the important one: it asks for everything filed nowhere, which
+ * is the pile that actually needs a chamber's attention. Null means the
+ * whole library, unnarrowed.
+ */
+function onShelf(folder: number | "none" | null) {
+  if (folder === null) return {};
+  return { folderId: folder === "none" ? null : folder };
 }
 
 function search(fields: string[], q: string) {
@@ -95,8 +113,8 @@ officeLibraryRouter.get(
   validateQuery(libraryListSchema),
   asyncHandler(async (req, res) => {
     const { db } = tenant(req);
-    const { q, limit } = res.locals.query as LibraryAdminQuery;
-    const where = search(["title", "citation", "court", "principle", "tags"], q);
+    const { folder, q, limit } = res.locals.query as LibraryAdminQuery;
+    const where = { ...search(["title", "citation", "court", "principle", "tags"], q), ...onShelf(folder) };
 
     const [items, published, shared] = await Promise.all([
       db.judgment.findMany({
@@ -191,8 +209,8 @@ officeLibraryRouter.get(
   validateQuery(libraryListSchema),
   asyncHandler(async (req, res) => {
     const { db } = tenant(req);
-    const { q, limit } = res.locals.query as LibraryAdminQuery;
-    const where = search(["title", "topic", "summary", "tags"], q);
+    const { folder, q, limit } = res.locals.query as LibraryAdminQuery;
+    const where = { ...search(["title", "topic", "summary", "tags"], q), ...onShelf(folder) };
 
     const [items, published, shared] = await Promise.all([
       db.research.findMany({ where, orderBy: { id: "desc" }, take: limit }),
@@ -277,8 +295,8 @@ officeLibraryRouter.get(
   validateQuery(libraryListSchema),
   asyncHandler(async (req, res) => {
     const { db } = tenant(req);
-    const { q, limit } = res.locals.query as LibraryAdminQuery;
-    const where = search(["title", "topic", "description"], q);
+    const { folder, q, limit } = res.locals.query as LibraryAdminQuery;
+    const where = { ...search(["title", "topic", "description"], q), ...onShelf(folder) };
 
     const [items, published, shared] = await Promise.all([
       db.media.findMany({ where, orderBy: { id: "desc" }, take: limit }),
@@ -485,5 +503,175 @@ officeLibraryRouter.post(
     });
 
     res.json(updated);
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Shelves
+// ---------------------------------------------------------------------------
+
+/**
+ * A chamber's library fills faster than anything else in the office, and a
+ * flat list of four hundred entries is one nobody looks in. These are the
+ * shelves it arranges them on: per kind, because judgments and written
+ * notes are not filed together on a real shelf either.
+ *
+ * Deliberately not under /library/:kind/... — that path already ends in an
+ * entry's id, and "folders" would arrive there as one.
+ */
+function assertKind(raw: string | undefined): "judgments" | "research" | "media" {
+  if (raw === "judgments" || raw === "research" || raw === "media") return raw;
+  throw new ApiError(400, "A library folder belongs to judgments, research or media.");
+}
+
+officeLibraryRouter.get(
+  "/library-folders/:kind",
+  requireCap("library.view"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const kind = assertKind(req.params.kind);
+
+    const folders = await db.libraryFolder.findMany({
+      where: { kind },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        sortOrder: true,
+        _count: { select: { judgments: true, research: true, media: true } },
+      },
+    });
+
+    // How many are on nothing. A chamber wants that number more than any
+    // other: it is the pile added in a hurry and never put away.
+    const unfiled =
+      kind === "judgments"
+        ? await db.judgment.count({ where: { folderId: null } })
+        : kind === "research"
+          ? await db.research.count({ where: { folderId: null } })
+          : await db.media.count({ where: { folderId: null } });
+
+    res.json({
+      items: folders.map((f) => ({
+        id: f.id,
+        name: f.name,
+        sortOrder: f.sortOrder,
+        count:
+          kind === "judgments"
+            ? f._count.judgments
+            : kind === "research"
+              ? f._count.research
+              : f._count.media,
+      })),
+      unfiled,
+    });
+  })
+);
+
+officeLibraryRouter.post(
+  "/library-folders/:kind",
+  requireCap("library.edit"),
+  validate(libraryFolderSchema),
+  asyncHandler(async (req, res) => {
+    const { db, firmId } = tenant(req);
+    const kind = assertKind(req.params.kind);
+    const { name, sortOrder } = req.body as LibraryFolderInput;
+
+    // Two shelves of the same name in the same part of the library would be
+    // indistinguishable on screen, so the database refuses it and this
+    // turns that refusal into something readable.
+    const clash = await db.libraryFolder.findFirst({ where: { kind, name } });
+    if (clash) throw new ApiError(409, `There is already a folder called "${name}".`);
+
+    const created = await db.libraryFolder.create({
+      data: { firmId, kind, name, sortOrder },
+      select: { id: true, name: true, sortOrder: true },
+    });
+    res.status(201).json(created);
+  })
+);
+
+officeLibraryRouter.patch(
+  "/library-folders/:id",
+  requireCap("library.edit"),
+  validate(libraryFolderEditSchema),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const id = parseId(req.params.id);
+    const { name, sortOrder } = req.body as LibraryFolderEdit;
+
+    const existing = await db.libraryFolder.findUnique({ where: { id } });
+    if (!existing) throw new ApiError(404, "No such folder.");
+
+    if (name !== undefined && name !== existing.name) {
+      const clash = await db.libraryFolder.findFirst({
+        where: { kind: existing.kind, name },
+      });
+      if (clash) throw new ApiError(409, `There is already a folder called "${name}".`);
+    }
+
+    await db.libraryFolder.update({
+      where: { id },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(sortOrder !== undefined ? { sortOrder } : {}),
+      },
+    });
+    res.status(204).end();
+  })
+);
+
+/**
+ * Removing a shelf, not what was on it.
+ *
+ * Everything filed here falls back to unfiled. A folder is how a chamber
+ * arranges its work; it is not what the work belongs to, and deleting the
+ * arrangement must never delete the research.
+ */
+officeLibraryRouter.delete(
+  "/library-folders/:id",
+  requireCap("library.edit"),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const id = parseId(req.params.id);
+    const removed = await db.libraryFolder.deleteMany({ where: { id } });
+    if (removed.count === 0) throw new ApiError(404, "No such folder.");
+    res.status(204).end();
+  })
+);
+
+/** Putting one entry on a shelf, or taking it off every shelf. */
+officeLibraryRouter.post(
+  "/library/:kind/:id/folder",
+  requireCap("library.edit"),
+  validate(libraryFileSchema),
+  asyncHandler(async (req, res) => {
+    const { db } = tenant(req);
+    const kind = assertKind(req.params.kind);
+    const id = parseId(req.params.id);
+    const { folderId } = req.body as LibraryFileInput;
+
+    if (folderId !== null) {
+      const folder = await db.libraryFolder.findUnique({ where: { id: folderId } });
+      if (!folder) throw new ApiError(404, "No such folder.");
+      // A judgment cannot go on a research shelf. They are separate
+      // libraries that happen to share a table.
+      if (folder.kind !== kind) {
+        throw new ApiError(400, "That folder is not part of this half of the library.");
+      }
+    }
+
+    // Written out rather than picked into a variable: the three delegates
+    // are separate types and their union is not callable, which is the
+    // compiler pointing out that a judgment and a recording are not
+    // interchangeable however alike the call looks.
+    const updated =
+      kind === "judgments"
+        ? await db.judgment.updateMany({ where: { id }, data: { folderId } })
+        : kind === "research"
+          ? await db.research.updateMany({ where: { id }, data: { folderId } })
+          : await db.media.updateMany({ where: { id }, data: { folderId } });
+    if (updated.count === 0) throw new ApiError(404, "No such entry.");
+    res.status(204).end();
   })
 );

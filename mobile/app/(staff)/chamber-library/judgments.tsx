@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { DateChoice } from "@/components/DateChoice";
 import { Field } from "@/components/Field";
+import { FileOnShelf } from "@/components/FileOnShelf";
 import { PublishSwitch, ShareRow } from "@/components/LibraryControls";
 import { ApiError } from "@/lib/api";
 import {
@@ -133,6 +134,10 @@ export default function JudgmentEditor() {
       <Field label="Note" value={draft.summary} onChange={(v) => set("summary", v)} multiline autoCapitalize="sentences" />
       <Field label="Tags" value={draft.tags} onChange={(v) => set("tags", v)} autoCapitalize="none" placeholder="bail, section 497" />
       <Field label="Link to the report" value={draft.sourceUrl} onChange={(v) => set("sourceUrl", v)} autoCapitalize="none" placeholder="https://" />
+
+      {entryId !== null && data ? (
+        <FileOnShelf kind="judgments" entryId={entryId} folderId={data.folderId} />
+      ) : null}
 
       <PublishSwitch
         published={draft.published}

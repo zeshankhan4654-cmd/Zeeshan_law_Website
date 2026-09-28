@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { DateChoice } from "@/components/DateChoice";
 import { Field } from "@/components/Field";
+import { FileOnShelf } from "@/components/FileOnShelf";
 import { PublishSwitch, ShareRow } from "@/components/LibraryControls";
 import { ApiError } from "@/lib/api";
 import { useLibraryEntry, useOfferToShared, useSaveLibraryEntry, type MediaEntry } from "@/lib/library-admin";
@@ -96,6 +97,10 @@ export default function MediaEditor() {
         <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-ink-soft">Recorded on</Text>
         <DateChoice value={draft.recordedOn} onChange={(v) => set("recordedOn", v)} />
       </View>
+
+      {entryId !== null && data ? (
+        <FileOnShelf kind="media" entryId={entryId} folderId={data.folderId} />
+      ) : null}
 
       <PublishSwitch
         published={draft.published}

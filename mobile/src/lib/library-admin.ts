@@ -22,6 +22,8 @@ export type ShareState = "none" | "pending" | "approved" | "declined" | string;
 
 export type JudgmentEntry = {
   id: number;
+  /** The shelf it is on, if any. */
+  folderId: number | null;
   title: string;
   citation: string;
   court: string;
@@ -38,6 +40,8 @@ export type JudgmentEntry = {
 
 export type ResearchEntry = {
   id: number;
+  /** The shelf it is on, if any. */
+  folderId: number | null;
   title: string;
   topic: string;
   summary: string;
@@ -49,6 +53,8 @@ export type ResearchEntry = {
 
 export type MediaEntry = {
   id: number;
+  /** The shelf it is on, if any. */
+  folderId: number | null;
   title: string;
   kind: string;
   description: string;
@@ -61,17 +67,97 @@ export type MediaEntry = {
 
 export type AnyEntry = JudgmentEntry | ResearchEntry | MediaEntry;
 
-export function useLibrary<T extends AnyEntry>(kind: LibraryKind, q: string) {
+/** Which shelf a list is narrowed to: one of them, the unfiled pile, or all. */
+export type Shelf = number | "none" | null;
+
+export function useLibrary<T extends AnyEntry>(kind: LibraryKind, q: string, shelf: Shelf = null) {
   const token = useAuthToken();
   return useQuery({
-    queryKey: ["office", "library", kind, q],
+    queryKey: ["office", "library", kind, q, shelf],
     queryFn: () =>
       apiFetch<{ items: T[]; published: number; shared: number }>(
-        `/api/office/library/${kind}?q=${encodeURIComponent(q)}`,
+        `/api/office/library/${kind}?q=${encodeURIComponent(q)}` +
+          (shelf === null ? "" : `&folder=${shelf}`),
         { token }
       ),
     enabled: token !== null,
   });
+}
+
+export type LibraryFolder = { id: number; name: string; sortOrder: number; count: number };
+
+/**
+ * The chamber's shelves for one half of the library.
+ *
+ * `unfiled` comes back with them because it is the number a chamber
+ * actually wants: everything added in a hurry and never put away.
+ */
+export function useFolders(kind: LibraryKind) {
+  const token = useAuthToken();
+  return useQuery({
+    queryKey: ["office", "library-folders", kind],
+    queryFn: () =>
+      apiFetch<{ items: LibraryFolder[]; unfiled: number }>(
+        `/api/office/library-folders/${kind}`,
+        { token }
+      ),
+    enabled: token !== null,
+  });
+}
+
+function useFolderMutation<TArgs>(
+  kind: LibraryKind,
+  run: (token: string | null, args: TArgs) => Promise<unknown>
+) {
+  const token = useAuthToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (args: TArgs) => run(token, args),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["office", "library-folders", kind] });
+      void queryClient.invalidateQueries({ queryKey: ["office", "library", kind] });
+    },
+  });
+}
+
+export function useAddFolder(kind: LibraryKind) {
+  return useFolderMutation<string>(kind, (token, name) =>
+    apiFetch(`/api/office/library-folders/${kind}`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ name }),
+    })
+  );
+}
+
+export function useRenameFolder(kind: LibraryKind) {
+  return useFolderMutation<{ id: number; name: string }>(kind, (token, { id, name }) =>
+    apiFetch(`/api/office/library-folders/${id}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ name }),
+    })
+  );
+}
+
+/** Removing the shelf, never what was on it — that falls back to unfiled. */
+export function useDeleteFolder(kind: LibraryKind) {
+  return useFolderMutation<number>(kind, (token, id) =>
+    apiFetch(`/api/office/library-folders/${id}`, { method: "DELETE", token })
+  );
+}
+
+/** Putting one entry on a shelf, or taking it off every shelf. */
+export function useFileEntry(kind: LibraryKind) {
+  return useFolderMutation<{ id: number; folderId: number | null }>(
+    kind,
+    (token, { id, folderId }) =>
+      apiFetch(`/api/office/library/${kind}/${id}/folder`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ folderId }),
+      })
+  );
 }
 
 export function useLibraryEntry<T extends AnyEntry>(kind: LibraryKind, id: number | null) {

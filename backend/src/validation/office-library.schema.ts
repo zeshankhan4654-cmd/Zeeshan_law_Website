@@ -60,10 +60,23 @@ export const mediaSchema = Joi.object({
 });
 
 export const libraryListSchema = Joi.object({
+  /**
+   * A folder id narrows the list to that shelf. "none" asks for what has
+   * been filed nowhere, which is the pile a chamber actually needs to see:
+   * everything added in a hurry and never put away.
+   */
+  folder: Joi.alternatives()
+    .try(Joi.number().integer().min(1), Joi.string().valid("none"))
+    .allow(null, "")
+    .default(null),
   q: Joi.string().trim().allow("").max(200).default(""),
   limit: Joi.number().integer().min(1).max(200).default(100),
 });
-export type LibraryAdminQuery = { q: string; limit: number };
+export type LibraryAdminQuery = {
+  folder: number | "none" | null;
+  q: string;
+  limit: number;
+};
 
 export type JudgmentInput = {
   title: string;
@@ -98,3 +111,28 @@ export type MediaInput = {
   recordedOn: Date | null;
   published: boolean;
 };
+
+/**
+ * A shelf in the chamber's own library.
+ *
+ * The name is all a chamber has to decide. Order is kept so a shelf can be
+ * arranged rather than alphabetised for it — the one an advocate reaches
+ * for most is rarely the one beginning with A.
+ */
+export const libraryFolderSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(120).required(),
+  sortOrder: Joi.number().integer().min(0).max(9999).default(0),
+});
+export type LibraryFolderInput = { name: string; sortOrder: number };
+
+export const libraryFolderEditSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(120),
+  sortOrder: Joi.number().integer().min(0).max(9999),
+}).min(1);
+export type LibraryFolderEdit = { name?: string; sortOrder?: number };
+
+/** Moving an entry onto a shelf, or off every shelf. */
+export const libraryFileSchema = Joi.object({
+  folderId: Joi.number().integer().min(1).allow(null).required(),
+});
+export type LibraryFileInput = { folderId: number | null };

@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Field } from "@/components/Field";
+import { FileOnShelf } from "@/components/FileOnShelf";
 import { PublishSwitch, ShareRow } from "@/components/LibraryControls";
 import { ApiError } from "@/lib/api";
 import { useLibraryEntry, useOfferToShared, useSaveLibraryEntry, type ResearchEntry } from "@/lib/library-admin";
@@ -83,6 +84,10 @@ export default function ResearchEditor() {
         hint="A phone suits notes and corrections. A long piece is easier at a desk."
       />
       <Field label="Tags" value={draft.tags} onChange={(v) => set("tags", v)} autoCapitalize="none" />
+
+      {entryId !== null && data ? (
+        <FileOnShelf kind="research" entryId={entryId} folderId={data.folderId} />
+      ) : null}
 
       <PublishSwitch
         published={draft.published}

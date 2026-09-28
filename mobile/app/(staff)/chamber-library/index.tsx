@@ -3,13 +3,16 @@ import { Plus, Search } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from "react-native";
 import {
+  useFolders,
   useLibrary,
   type AnyEntry,
   type JudgmentEntry,
   type LibraryKind,
   type MediaEntry,
   type ResearchEntry,
+  type Shelf,
 } from "@/lib/library-admin";
+import { Shelves } from "@/components/Shelves";
 import { can, useSession } from "@/lib/session";
 
 const TABS: { key: LibraryKind; label: string }[] = [
@@ -21,10 +24,12 @@ const TABS: { key: LibraryKind; label: string }[] = [
 export default function ChamberLibrary() {
   const [kind, setKind] = useState<LibraryKind>("judgments");
   const [q, setQ] = useState("");
+  const [shelf, setShelf] = useState<Shelf>(null);
   const router = useRouter();
   const session = useSession();
   const mayEdit = can(session.status === "signed-in" ? session.account : null, "library.edit");
-  const { data, isPending } = useLibrary<AnyEntry>(kind, q);
+  const { data, isPending } = useLibrary<AnyEntry>(kind, q, shelf);
+  const { data: folders } = useFolders(kind);
 
   return (
     <View className="flex-1">
@@ -35,7 +40,10 @@ export default function ChamberLibrary() {
             return (
               <Pressable
                 key={t.key}
-                onPress={() => setKind(t.key)}
+                onPress={() => {
+                  setKind(t.key);
+                  setShelf(null);
+                }}
                 className={`flex-1 items-center rounded-card border py-2 ${
                   on ? "border-gold bg-gold-wash" : "border-rule"
                 }`}
@@ -47,6 +55,15 @@ export default function ChamberLibrary() {
             );
           })}
         </View>
+        <Shelves
+          kind={kind}
+          folders={folders?.items ?? []}
+          unfiled={folders?.unfiled ?? 0}
+          shelf={shelf}
+          onPick={setShelf}
+          mayEdit={mayEdit}
+        />
+
         <View className="flex-row items-center gap-2">
           <Search size={18} color="#4b443a" />
           <TextInput
