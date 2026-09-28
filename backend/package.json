@@ -20,7 +20,8 @@
     "backup": "./scripts/backup.sh",
     "check:isolation": "tsx scripts/check-isolation.ts",
     "platform:grant": "tsx scripts/grant-platform-admin.ts",
-    "platform:revoke": "tsx scripts/grant-platform-admin.ts --revoke"
+    "platform:revoke": "tsx scripts/grant-platform-admin.ts --revoke",
+    "review:chamber": "tsx scripts/review-chamber.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
